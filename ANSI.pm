@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2004 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 0.05 (2004/02/26)
+# Version 0.06 (20/09/2004)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,7 +19,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 our $DEBUG = 0;
 
 # print overloading
@@ -151,15 +151,11 @@ sub _PrintString {
         elsif ($4 eq 'J') {
           if (!$3) {                            # ESC[0J from cursor to end of display
             my @info = $self->{Out}->Info();
-            my $s = ' 'x(($info[1]-$info[3]-1)*$info[0]+$info[0]-$info[2]-1);
-            $self->{Out}->WriteChar($s, $info[2], $info[3]);
-            $self->{Out}->Cursor($info[2], $info[3]);
+            $self->{Out}->FillChar(' ', ($info[1]-$info[3]-1)*$info[0]+$info[0]-$info[2]-1,$info[2], $info[3]);
           }
           elsif ($3==1) {                       # ESC[1J erase from start to cursor.
             my @info = $self->{Out}->Info();
-            my $s = ' 'x($info[3]*$info[0]+$info[2]+1);
-            $self->{Out}->WriteChar($s, 0, 0);
-            $self->{Out}->Cursor($info[2], $info[3]);
+            $self->{Out}->FillChar(' ', $info[3]*$info[0]+$info[2]+1, 0, 0);
           }
           elsif ($3 == 2) {                     # ESC[2J Clear screen and home cursor
             $self->{Out}->Cls();
@@ -172,19 +168,13 @@ sub _PrintString {
         elsif ($4 eq 'K') {
           my @info = $self->{Out}->Info();
           if (!$3) {                            # ESC[0K Clear to end of line
-            my $s = ' 'x($info[7]-$info[2]+1);
-            $self->{Out}->Write($s);
-            $self->{Out}->Cursor($info[2], $info[3]);
+            $self->{Out}->FillChar(' ', $info[7]-$info[2]+1, $info[2], $info[3]);
           }
           elsif ($3==1) {                       # ESC[1K Clear from start of line to cursor
-            my $s = ' 'x($info[2]+1);
-            $self->{Out}->WriteChar($s, 0, $info[3]);
-            $self->{Out}->Cursor($info[2], $info[3]);
+            $self->{Out}->FillChar(' ', $info[2]+1, 0, $info[3]);
           }
           elsif ($3==2) {                       # ESC[2K Clear whole line.
-            my $s = ' 'x $info[0];
-            $self->{Out}->WriteChar($s, 0, $info[3]);
-            $self->{Out}->Cursor($info[2], $info[3]);
+            $self->{Out}->FillChar(' ', $info[0], 0, $info[3]); 
           }
         }
         elsif ($4 eq 'L') {                     # ESC[#L Insert # blank lines.
@@ -213,10 +203,7 @@ sub _PrintString {
                                $info[2], $info[3],
                                unpack("c"," "), $self->{Out}->Attr(),
                                0, 0, 10000, 10000);
-          my $s = ' 'x $n;
-          $self->{Out}->Cursor($info[0]-$n, $info[3]);
-          $self->{Out}->Write($s);
-          $self->{Out}->Cursor($info[2], $info[3]);
+          $self->{Out}->FillChar(' ', $n, $info[0]-$n, $info[3]);          
         }
         elsif ($4 eq '@') {                     # ESC[#@ Insert # blank Characters
           my $s = ' 'x $3;
@@ -275,7 +262,6 @@ sub _PrintString {
         elsif ($4 eq 'u') {                      # ESC[u Return to saved cursor position
           $self->{Out}->Cursor($self->{x}, $self->{y});
         }
-
         else {
           print STDERR "\e$2$3$4 not implemented\n" if $DEBUG;  # ESC-code not implemented
         }
@@ -384,8 +370,12 @@ package Win32::Console::ANSI;
 
 # Create tied filehandles for print overloading.
 
-tie *STDOUT, 'Win32::Console::ANSI::IO', 'STDOUT';
+if (-t STDOUT) {
+  tie *STDOUT, 'Win32::Console::ANSI::IO', 'STDOUT';
+}
+if (-t STDERR) {
 tie *STDERR, 'Win32::Console::ANSI::IO', 'STDERR';
+}
 
 1;
 __END__

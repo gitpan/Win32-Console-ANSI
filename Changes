@@ -30,4 +30,10 @@ Revision history for Perl extension Win32::Console::ANSI
   - the module takes now the pragma -w and (use warnings) into account.
   - bug: print '0' print nothing! -fixed
     Thanks to Daniel Schoene to report this bug.
+    
+0.06  20/09/2004
+  - bug: with \e[#K, if the cursor is on the last line of the console,
+         a new line is added. -fixed.
+    Thanks to Eric Zmiro for reporting this bug.
+  - STDIN and STDERR are tied only if there are tty
 

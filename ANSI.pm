@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2003 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 0.03 (2003/07/21)
+# Version 0.04 (2003/10/09)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,7 +19,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 our $DEBUG = 0;
 
 # print overloading
@@ -330,16 +330,19 @@ sub _conv {                     # conversions
 return $s;
 }
 
-sub print {
+sub TIEHANDLE { shift->new(@_) }
+
+sub PRINT {
   my $self = shift;
-  foreach my $s (@_) {
-    $self->_PrintString($s)
-  }
+  $self->_PrintString($_) foreach @_;
 }
 
-sub TIEHANDLE { shift->new(@_)             }
-sub PRINT     { shift->print(@_)           }
-sub PRINTF    { shift->print(sprintf(@_))  }
+sub PRINTF {
+  my $self = shift;
+  my $format = shift;
+  $self->_PrintString(sprintf $format, @_)
+}
+
 1;
 
 # end print overloading

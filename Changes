@@ -21,4 +21,6 @@ Revision history for Perl extension Win32::Console::ANSI
   - bug: \e(K now restore the original code page.
   - fixed some typo in doc and test.pl
 
-
+0.04  2003/10/09
+  - bug: the printf function doesn't work as expected! -fixed.
+    Thanks to Mark A. Rudolph to report this bug.

@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2004 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 0.06 (20/09/2004)
+# Version 0.07 (02/01/2005)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,13 +19,20 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 our $DEBUG = 0;
+our $CON;
+
+our @EXPORT_OK = ( 'Title', 'Cursor',
+);
+
+our @EXPORT = qw(
+);
 
 # print overloading
 
 package Win32::Console::ANSI::IO;
-# use Carp qw/carp/;
+use Carp qw/carp croak/;
 use Win32::Console;
 use Win32API::Registry qw( :HKEY_ :KEY_ );
 
@@ -64,17 +71,21 @@ my %color = ( 30 => 0,                                               # black for
               47 => BACKGROUND_RED|BACKGROUND_GREEN|BACKGROUND_BLUE, # white background
             );
 
-sub new {
+sub TIEHANDLE {
   my $self = bless {}, shift;
   $self->{handle} = shift;
   if ($self->{handle} eq 'STDOUT') {
     $self->{'Out'} = new Win32::Console(STD_OUTPUT_HANDLE);
+    $self->{'fileno'} = fileno STDOUT;
+    $CON = $self->{'Out'};
   }
   else {
     $self->{'Out'} = new Win32::Console(STD_ERROR_HANDLE);
+    $self->{'fileno'} = fileno STDERR;
+    $CON = $self->{'Out'} unless defined $CON;
   }
   $self->{x} = 0;
-  $self->{y} = 0;           # to save cursor position
+  $self->{y} = 0;           # to save cursor position ESC[s
   $self->{foreground} = 7;
   $self->{background} = 0;
   $self->{bold} = 0;
@@ -174,7 +185,7 @@ sub _PrintString {
             $self->{Out}->FillChar(' ', $info[2]+1, 0, $info[3]);
           }
           elsif ($3==2) {                       # ESC[2K Clear whole line.
-            $self->{Out}->FillChar(' ', $info[0], 0, $info[3]); 
+            $self->{Out}->FillChar(' ', $info[0], 0, $info[3]);
           }
         }
         elsif ($4 eq 'L') {                     # ESC[#L Insert # blank lines.
@@ -203,7 +214,7 @@ sub _PrintString {
                                $info[2], $info[3],
                                unpack("c"," "), $self->{Out}->Attr(),
                                0, 0, 10000, 10000);
-          $self->{Out}->FillChar(' ', $n, $info[0]-$n, $info[3]);          
+          $self->{Out}->FillChar(' ', $n, $info[0]-$n, $info[3]);
         }
         elsif ($4 eq '@') {                     # ESC[#@ Insert # blank Characters
           my $s = ' 'x $3;
@@ -321,8 +332,6 @@ sub _conv {                     # conversions
 return $s;
 }
 
-sub TIEHANDLE { shift->new(@_) }
-
 sub PRINT {
   my $self = shift;
   my $s;
@@ -349,15 +358,45 @@ sub PRINTF {
 sub CLOSE {
   my $self = shift;
   if ($self->{handle} eq 'STDOUT') {
-    no warnings;
-    untie *STDOUT;
-    close STDOUT;
+    undef *STDOUT;
   }
   else {
-    no warnings;
-    untie *STDERR;
-    close STDERR;
+    undef *STDERR;
   }
+}
+
+sub OPEN {
+  my $self = shift;
+  unless (@_) {
+    warnings::warnif('uninitialized', "Use of uninitialized value in open");
+    return 1;
+  }
+  my $n = shift;
+  my $r;
+  if ($self->{handle} eq 'STDOUT') {
+    undef *STDOUT;
+    eval{$r = open STDOUT, $n, @_;};
+    if ($@) {
+      $@ =~ s/ at .*$//;
+      chomp $@;
+      warnings::warnif('all', $@);
+    }
+  }
+  else {
+    undef *STDERR;
+    eval{$r = open STDERR, $n, @_;};
+    if ($@) {
+      $@ =~ s/ at .*$//;
+      chomp $@;
+      warnings::warnif('all', $@);
+    }
+  }
+  return $r;
+}
+
+sub FILENO {
+  my $self = shift;
+  return $self->{'fileno'};
 }
 
 1;
@@ -374,7 +413,23 @@ if (-t STDOUT) {
   tie *STDOUT, 'Win32::Console::ANSI::IO', 'STDOUT';
 }
 if (-t STDERR) {
-tie *STDERR, 'Win32::Console::ANSI::IO', 'STDERR';
+  tie *STDERR, 'Win32::Console::ANSI::IO', 'STDERR';
+}
+
+# Auxiliary functions
+
+sub Title {
+  my $t = shift;
+  my $r = Win32::Console::Title();
+  Win32::Console::Title($t) if defined $t;
+  return $r;
+}
+
+sub Cursor {
+  return unless defined $CON;
+  my ($oldx, $oldy) = $CON->Cursor();
+  $CON->Cursor($_[0]-1, $_[1]-1) if 1 < @_;  # origin (0,0) in DOS console
+  return ($oldx+1, $oldy+1);
 }
 
 1;
@@ -677,6 +732,41 @@ console font is the Lucida Console TrueType font.)
 
 =back
 
+=head1 AUXILIARY FUNCTIONS
+
+Because the module exports no symbols into the callers namespace, it's 
+necessary to import the names of the functions before using them.
+
+=over
+
+=item * $old_title = Title( [$new_title] );
+
+Gets and sets the title bar of the current console window. With no argument
+the title is not modified.
+
+  use Win32::Console::ANSI qw/ Title /;
+  for (reverse 0..5) {
+    Title "Count down ... $_";
+    sleep 1;
+  }
+
+=item * ($old_x, $old_y) = Cursor( [$new_x, $new_y] );
+
+Gets and sets the cursor position (the upper-left corner of the screen is
+at (1, 1)). With no arguments the cursor position is not modified. If one
+of the two coordinates $new_x or $new_y is 0, the the corresponding
+coordinate doesn't change.
+
+  use Win32::Console::ANSI qw/ Cursor /;
+  ($x, $y) = Cursor();     # reads cursor position
+  Cursor(5, 8);            # puts the cursor at column 5, line 8
+  Cursor(5, 0);            # puts the cursor at column 5, line doesn't change
+  Cursor(0, 8);            # puts the cursor at line 8, column doesn't change
+  Cursor(0, 0);            # the cursor doesn't change a position (useless!)
+  ($x, $y) = Cursor(5, 8); # reads cursor position AND puts cursor at (5, 8)
+
+=back
+
 =head1 LIMITATIONS
 
 =over
@@ -685,6 +775,24 @@ console font is the Lucida Console TrueType font.)
 
 Due to DOS-console limitations, the blink mode (text attributes 5 and 25) is
 not implemented.
+
+=item *
+
+Because with this module C<STDERR> and C<STDOUT> are tied filehandles it's
+not possible to duplicate them as usual:
+
+  open(OUTCOPY, ">&STDOUT");  # the tie is broken
+
+If you print in C<OUTCOPY> the conversion is lost.
+
+As a consequence this module is incompatible with the 
+L<IPC::Open2|IPC::Open2> and L<IPC::Open3|IPC::Open3> modules.
+
+=item *
+
+It has been reported that this module is not thread-safe. There is a
+problem with the method C<join>: C<STDOUT> is sometimes mysteriously closed.
+It's an odd bug in the C<Win32::Console> module.
 
 =back
 
@@ -709,7 +817,7 @@ The method used to overload the print function is due to Matt Sergeant
 
 =head1 COPYRIGHT
 
-Copyright (c) 2003-2004 J-L Morel. All rights reserved.
+Copyright (c) 2003-2005 J-L Morel. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

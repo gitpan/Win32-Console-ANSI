@@ -6,10 +6,7 @@ use strict;
 # `make test'. After `make install' it should work as `perl test.pl'
 
 #########################
-use Win32::Console;
-use Win32::Console::ANSI;
-
-my $Out = new Win32::Console (STD_OUTPUT_HANDLE) or die $^E;
+use Win32::Console::ANSI qw/ Cursor /;
 
 my $save = 0;
 my $s = '';
@@ -21,8 +18,8 @@ $s .= "test01...........Ok\n" unless $save;
 # test 02 - Cursor Position
 print "\e[2J";
 print "\e[6;23H";
-my ($x, $y) = $Out->Cursor();
-if ($x==22 and $y==5) {
+my ($x, $y) = Cursor();
+if ($x==23 and $y==6) {
   $s .= "test02...........Ok\n" unless $save;
 }
 else {
@@ -31,8 +28,8 @@ else {
 
 # test 03 - Cursor Movement
 print "\e[5C\e[6B\e[2D\e[3A";
-($x, $y) = $Out->Cursor();
-if ($x==25 and $y==8) {
+($x, $y) = Cursor();
+if ($x==26 and $y==9) {
   $s .= "test03...........Ok\n" unless $save;
 }
 else {
@@ -42,7 +39,8 @@ else {
 # test 04 - Save and Restore Cursor Position
 print "\e[s\n\n\n";
 print "\e[u";
-if ($x==25 and $y==8) {
+($x, $y) = Cursor();
+if ($x==26 and $y==9) {
   $s .= "test04...........Ok\n" unless $save;
 }
 else {
@@ -51,8 +49,8 @@ else {
 
 # test 05 - Cursor Movement (continued)
 print "\e[5E\e[2F\e[33G";
-($x, $y) = $Out->Cursor();
-if ($x==32 and $y==11) {
+($x, $y) = Cursor();
+if ($x==33 and $y==12) {
   $s .= "test05...........Ok\n" unless $save;
 }
 else {

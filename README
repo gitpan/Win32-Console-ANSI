@@ -1,4 +1,4 @@
-Win32::Console::ANSI version 0.02
+Win32::Console::ANSI version 0.03
 =================================
 
 Windows NT/2000/XP does not support ANSI escape sequences in

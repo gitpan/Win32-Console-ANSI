@@ -31,7 +31,7 @@ else {
 
 # test 03 - Cursor Movement
 print "\e[5C\e[6B\e[2D\e[3A";
-my ($x, $y) = $Out->Cursor();
+($x, $y) = $Out->Cursor();
 if ($x==25 and $y==8) {
   $s .= "test03...........Ok\n" unless $save;
 }
@@ -62,3 +62,4 @@ else {
 # the end
 
 print "\e[2J\n$s";
+

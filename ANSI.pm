@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2003 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 0.02 (13/07/2003)
+# Version 0.03 (2003/07/21)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,12 +19,13 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 our $DEBUG = 0;
 
 # print overloading
 
 package Win32::Console::ANSI::IO;
+use Carp qw/croak/;
 use Win32::Console;
 use Win32API::Registry qw( :HKEY_ :KEY_ );
 
@@ -40,7 +41,8 @@ Win32API::Registry::RegQueryValueEx( $key, 'ACP', [], [], $cpANSI, [] );
 Win32API::Registry::RegCloseKey( $key );
 print STDERR "Unable to read Win codepage\n" if $DEBUG and !$cpANSI;
 $cpANSI = 'cp'.($cpANSI ? $cpANSI : 1252);      # Windows codepage
-my $cpOEM = 'cp'.Win32::Console::OutputCP();    # DOS codepage
+my $OEM = Win32::Console::OutputCP();
+my $cpOEM = 'cp'.$OEM;                          # DOS codepage
 my $cp = $cpANSI.$cpOEM;
 print STDERR "EncodeOk=$EncodeOk cpANSI=$cpANSI cpOEM=$cpOEM\n" if $DEBUG;
 
@@ -79,217 +81,222 @@ sub new {
 
 sub _PrintString {
   my ($self, $s) = @_;
-  my ($x, $y, $n);
-  if ( $s =~ /([^\e]*)?\e([\[(])([0-9\;\=]*)([a-zA-Z@])(.*)/s ) {
-    $self->{Out}->Write((_conv($self, $1)));
-    if ( $2 eq '[' ) {
-      if ($4 eq 'm') {                        # ESC[#;#;....;#m Set display attributes
-        my @attributs = split /\;/, $3;
-        push @attributs, 0 unless @attributs;   # ESC[m == ESC[;m ==...==ESC[0m
-        my $attribut;
-        foreach my $attr (@attributs) {
-          if ( $attr ) {
-            if ( $attr == 1 ) {
-              $self->{bold} = 1;
+  croak("Use of uninitialized value in print") unless defined $s;
+  while ($s) {
+    my ($x, $y, $n);
+    if ( $s =~ s/([^\e]*)?\e([\[(])([0-9\;\=]*)([a-zA-Z@])(.*)/$5/s ) {
+      $self->{Out}->Write((_conv($self, $1)));
+      if ( $2 eq '[' ) {
+        if ($4 eq 'm') {                        # ESC[#;#;....;#m Set display attributes
+          my @attributs = split /\;/, $3;
+          push @attributs, 0 unless @attributs;   # ESC[m == ESC[;m ==...==ESC[0m
+          my $attribut;
+          foreach my $attr (@attributs) {
+            if ( $attr ) {
+              if ( $attr == 1 ) {
+                $self->{bold} = 1;
+              }
+              elsif ( $attr == 21 ) {
+                $self->{bold} = 0;
+              }
+              elsif ( $attr == 4 ) {
+                $self->{underline} = 1;
+              }
+              elsif ( $attr == 24 ) {
+                $self->{underline} = 0;
+              }
+              elsif ( $attr == 7 ) {
+                $self->{revideo} = 1;
+              }
+              elsif ( $attr == 27 ) {
+                $self->{revideo} = 0;
+              }
+              elsif ( $attr == 8 ) {
+                $self->{concealed} = 1;
+              }
+              elsif ( $attr == 28 ) {
+                $self->{concealed} = 0;
+              }
+              elsif ( $attr>=30 and $attr<=37 ) {
+                $self->{foreground} = $attr-30;
+              }
+              elsif ( $attr>=40 and $attr<=47 ) {
+                $self->{background} = $attr-40;
+              }
             }
-            elsif ( $attr == 21 ) {
+            else {                                # ESC[0m reset
+              $self->{foreground} = 7;
+              $self->{background} = 0;
               $self->{bold} = 0;
-            }
-            elsif ( $attr == 4 ) {
-              $self->{underline} = 1;
-            }
-            elsif ( $attr == 24 ) {
               $self->{underline} = 0;
-            }
-            elsif ( $attr == 7 ) {
-              $self->{revideo} = 1;
-            }
-            elsif ( $attr == 27 ) {
               $self->{revideo} = 0;
-            }
-            elsif ( $attr == 8 ) {
-              $self->{concealed} = 1;
-            }
-            elsif ( $attr == 28 ) {
               $self->{concealed} = 0;
             }
-            elsif ( $attr>=30 and $attr<=37 ) {
-              $self->{foreground} = $attr-30;
-            }
-            elsif ( $attr>=40 and $attr<=47 ) {
-              $self->{background} = $attr-40;
-            }
           }
-          else {                                # ESC[0m reset
-            $self->{foreground} = 7;
-            $self->{background} = 0;
-            $self->{bold} = 0;
-            $self->{underline} = 0;
-            $self->{revideo} = 0;
-            $self->{concealed} = 0;
+          if ($self->{revideo}) {
+            $attribut = $color{40+$self->{foreground}}|$color{30+$self->{background}};
+          }
+          else {
+            $attribut = $color{30+$self->{foreground}}|$color{40+$self->{background}};
+          }
+          $attribut |= FOREGROUND_INTENSITY if $self->{bold};
+          $attribut |= BACKGROUND_INTENSITY if $self->{underline};
+          $self->{Out}->Attr($attribut);
+        }
+        elsif ($4 eq 'J') {
+          if (!$3) {                            # ESC[0J from cursor to end of display
+            my @info = $self->{Out}->Info();
+            my $s = ' 'x(($info[1]-$info[3]-1)*$info[0]+$info[0]-$info[2]-1);
+            $self->{Out}->WriteChar($s, $info[2], $info[3]);
+            $self->{Out}->Cursor($info[2], $info[3]);
+          }
+          elsif ($3==1) {                       # ESC[1J erase from start to cursor.
+            my @info = $self->{Out}->Info();
+            my $s = ' 'x($info[3]*$info[0]+$info[2]+1);
+            $self->{Out}->WriteChar($s, 0, 0);
+            $self->{Out}->Cursor($info[2], $info[3]);
+          }
+          elsif ($3 == 2) {                     # ESC[2J Clear screen and home cursor
+            $self->{Out}->Cls();
+            $self->{Out}->Cursor(0, 0);
+          }
+          else {
+            print STDERR "\e$2$3$4" if $DEBUG;     # if ESC-code not implemented
           }
         }
-        if ($self->{revideo}) {
-          $attribut = $color{40+$self->{foreground}}|$color{30+$self->{background}};
-        }
-        else {
-          $attribut = $color{30+$self->{foreground}}|$color{40+$self->{background}};
-        }
-        $attribut |= FOREGROUND_INTENSITY if $self->{bold};
-        $attribut |= BACKGROUND_INTENSITY if $self->{underline};
-        $self->{Out}->Attr($attribut);
-      }
-      elsif ($4 eq 'J') {
-        if (!$3) {                            # ESC[0J from cursor to end of display
+        elsif ($4 eq 'K') {
           my @info = $self->{Out}->Info();
-          my $s = ' 'x(($info[1]-$info[3]-1)*$info[0]+$info[0]-$info[2]-1);
-          $self->{Out}->WriteChar($s, $info[2], $info[3]);
+          if (!$3) {                            # ESC[0K Clear to end of line
+            my $s = ' 'x($info[7]-$info[2]+1);
+            $self->{Out}->Write($s);
+            $self->{Out}->Cursor($info[2], $info[3]);
+          }
+          elsif ($3==1) {                       # ESC[1K Clear from start of line to cursor
+            my $s = ' 'x($info[2]+1);
+            $self->{Out}->WriteChar($s, 0, $info[3]);
+            $self->{Out}->Cursor($info[2], $info[3]);
+          }
+          elsif ($3==2) {                       # ESC[2K Clear whole line.
+            my $s = ' 'x $info[0];
+            $self->{Out}->WriteChar($s, 0, $info[3]);
+            $self->{Out}->Cursor($info[2], $info[3]);
+          }
+        }
+        elsif ($4 eq 'L') {                     # ESC[#L Insert # blank lines.
+          $n = $3 eq ''? 1 : $3;  # ESC[L == ESC[1L
+          my @info = $self->{Out}->Info();
+          $self->{Out}->Scroll(0, $info[3], $info[0]-1, $info[1]-1,
+                               0, $info[3]+$n,
+                               unpack("c"," "), $self->{Out}->Attr(),
+                               0, 0, 10000, 10000);
           $self->{Out}->Cursor($info[2], $info[3]);
         }
-        elsif ($3==1) {                       # ESC[1J erase from start to cursor.
+        elsif ($4 eq 'M') {                     # ESC[#M Delete # line.
+          $n = $3 eq ''? 1 : $3;  # ESC[M == ESC[1M
           my @info = $self->{Out}->Info();
-          my $s = ' 'x($info[3]*$info[0]+$info[2]+1);
-          $self->{Out}->WriteChar($s, 0, 0);
+          $self->{Out}->Scroll(0, $info[3]+$n, $info[0]-1, $info[1]-1,
+                               0, $info[3],
+                               unpack("c"," "), $self->{Out}->Attr(),
+                               0, 0, 10000, 10000);
           $self->{Out}->Cursor($info[2], $info[3]);
         }
-        elsif ($3 == 2) {                     # ESC[2J Clear screen and home cursor
-          $self->{Out}->Cls();
-          $self->{Out}->Cursor(0, 0);
-        }
-        else {
-          print STDERR "\e$2$3$4" if $DEBUG;     # if ESC-code not implemented
-        }
-      }
-      elsif ($4 eq 'K') {
-        my @info = $self->{Out}->Info();
-        if (!$3) {                            # ESC[0K Clear to end of line
-          my $s = ' 'x($info[7]-$info[2]+1);
+        elsif ($4 eq 'P') {                     # ESC[#P Delete # characters.
+          $n = $3 eq ''? 1 : $3;  # ESC[P == ESC[1P
+          my @info = $self->{Out}->Info();
+          $n = $info[0]-$info[2] if $info[2]+$n > $info[0]-1;
+          $self->{Out}->Scroll($info[2]+$n, $info[3] , $info[0]-1, $info[3],
+                               $info[2], $info[3],
+                               unpack("c"," "), $self->{Out}->Attr(),
+                               0, 0, 10000, 10000);
+          my $s = ' 'x $n;
+          $self->{Out}->Cursor($info[0]-$n, $info[3]);
           $self->{Out}->Write($s);
           $self->{Out}->Cursor($info[2], $info[3]);
         }
-        elsif ($3==1) {                       # ESC[1K Clear from start of line to cursor
-          my $s = ' 'x($info[2]+1);
-          $self->{Out}->WriteChar($s, 0, $info[3]);
+        elsif ($4 eq '@') {                     # ESC[#@ Insert # blank Characters
+          my $s = ' 'x $3;
+          my @info = $self->{Out}->Info();
+          $s .= $self->{Out}->ReadChar ($info[7]-$info[2]+1, $info[2], $info[3]);
+          $s = substr $s, 0, -$3;
+          $self->{Out}->Write($s);
           $self->{Out}->Cursor($info[2], $info[3]);
         }
-        elsif ($3==2) {                       # ESC[2K Clear whole line.
-          my $s = ' 'x $info[0];
-          $self->{Out}->WriteChar($s, 0, $info[3]);
-          $self->{Out}->Cursor($info[2], $info[3]);
+        elsif ($4 eq 'A') {                     # ESC[#A Moves cursor up # lines
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[A == ESC[1A
+          $self->{Out}->Cursor($x, $y-$n);
         }
-      }
-      elsif ($4 eq 'L') {                     # ESC[#L Insert # blank lines.
-        $n = $3 eq ''? 1 : $3;  # ESC[L == ESC[1L
-        my @info = $self->{Out}->Info();
-        $self->{Out}->Scroll(0, $info[3], $info[0]-1, $info[1]-1,
-                             0, $info[3]+$n,
-                             unpack("c"," "), $self->{Out}->Attr(),
-                             0, 0, 10000, 10000);
-        $self->{Out}->Cursor($info[2], $info[3]);
-      }
-      elsif ($4 eq 'M') {                     # ESC[#M Delete # line.
-        $n = $3 eq ''? 1 : $3;  # ESC[M == ESC[1M
-        my @info = $self->{Out}->Info();
-        $self->{Out}->Scroll(0, $info[3]+$n, $info[0]-1, $info[1]-1,
-                             0, $info[3],
-                             unpack("c"," "), $self->{Out}->Attr(),
-                             0, 0, 10000, 10000);
-        $self->{Out}->Cursor($info[2], $info[3]);
-      }
-      elsif ($4 eq 'P') {                     # ESC[#P Delete # characters.
-        $n = $3 eq ''? 1 : $3;  # ESC[P == ESC[1P
-        my @info = $self->{Out}->Info();
-        $n = $info[0]-$info[2] if $info[2]+$n > $info[0]-1;
-        $self->{Out}->Scroll($info[2]+$n, $info[3] , $info[0]-1, $info[3],
-                             $info[2], $info[3],
-                             unpack("c"," "), $self->{Out}->Attr(),
-                             0, 0, 10000, 10000);
-        my $s = ' 'x $n;
-        $self->{Out}->Cursor($info[0]-$n, $info[3]);
-        $self->{Out}->Write($s);
-        $self->{Out}->Cursor($info[2], $info[3]);
-      }
-      elsif ($4 eq '@') {                     # ESC[#@ Insert # blank Characters
-        my $s = ' 'x $3;
-        my @info = $self->{Out}->Info();
-        $s .= $self->{Out}->ReadChar ($info[7]-$info[2]+1, $info[2], $info[3]);
-        $s = substr $s, 0, -$3;
-        $self->{Out}->Write($s);
-        $self->{Out}->Cursor($info[2], $info[3]);
-      }
-      elsif ($4 eq 'A') {                     # ESC[#A Moves cursor up # lines
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[A == ESC[1A
-        $self->{Out}->Cursor($x, $y-$n);
-      }
-      elsif ($4 eq 'B') {                     # ESC[#B Moves cursor down # lines
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[B == ESC[1B
-        $self->{Out}->Cursor($x, $y+$n);
-      }
-      elsif ($4 eq 'C') {                     # ESC[#C Moves cursor forward # spaces
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[C == ESC[1C
-        $self->{Out}->Cursor($x+$n, $y);
-      }
-      elsif ($4 eq 'D') {                     # ESC[#D Moves cursor back # spaces
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[D == ESC[1D
-        $self->{Out}->Cursor($x-$n, $y);
-      }
-      elsif ($4 eq 'E') {                     # ESC[#E Moves cursor down # lines, column 1.
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[E == ESC[1E
-        $self->{Out}->Cursor(0, $y+$n);
-      }
-      elsif ($4 eq 'F') {                     # ESC[#F Moves cursor up # lines, column 1.
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[F == ESC[1F
-        $self->{Out}->Cursor(0, $y-$n);
-      }
-      elsif ($4 eq 'G') {                     # ESC[#G Moves cursor column # in current row.
-        ($x, $y) = $self->{Out}->Cursor();
-        $n = $3 eq ''? 1 : $3;  # ESC[G == ESC[1G
-        $self->{Out}->Cursor($n-1, $y);
-      }
-      elsif ($4 eq 'H' or $4 eq 'f') {        # ESC[#;#H or ESC[#;#f Moves cursor to line #, column #
-        ($y, $x) = split /\;/, $3;
-        $x = 1 unless $x;    # ESC[;5H == ESC[1;5H ...etc
-        $y = 1 unless $y;
-        $self->{Out}->Cursor($x-1, $y-1);  # origin (0,0) in DOS console
-      }
-      elsif ($4 eq 's') {                      # ESC[s Saves cursor position for recall later
-        ($x, $y) = $self->{Out}->Cursor();
-        $self->{x} = $x;
-        $self->{y} = $y;
-      }
-      elsif ($4 eq 'u') {                      # ESC[u Return to saved cursor position
-        $self->{Out}->Cursor($self->{x}, $self->{y});
-      }
+        elsif ($4 eq 'B') {                     # ESC[#B Moves cursor down # lines
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[B == ESC[1B
+          $self->{Out}->Cursor($x, $y+$n);
+        }
+        elsif ($4 eq 'C') {                     # ESC[#C Moves cursor forward # spaces
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[C == ESC[1C
+          $self->{Out}->Cursor($x+$n, $y);
+        }
+        elsif ($4 eq 'D') {                     # ESC[#D Moves cursor back # spaces
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[D == ESC[1D
+          $self->{Out}->Cursor($x-$n, $y);
+        }
+        elsif ($4 eq 'E') {                     # ESC[#E Moves cursor down # lines, column 1.
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[E == ESC[1E
+          $self->{Out}->Cursor(0, $y+$n);
+        }
+        elsif ($4 eq 'F') {                     # ESC[#F Moves cursor up # lines, column 1.
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[F == ESC[1F
+          $self->{Out}->Cursor(0, $y-$n);
+        }
+        elsif ($4 eq 'G') {                     # ESC[#G Moves cursor column # in current row.
+          ($x, $y) = $self->{Out}->Cursor();
+          $n = $3 eq ''? 1 : $3;  # ESC[G == ESC[1G
+          $self->{Out}->Cursor($n-1, $y);
+        }
+        elsif ($4 eq 'H' or $4 eq 'f') {        # ESC[#;#H or ESC[#;#f Moves cursor to line #, column #
+          ($y, $x) = split /\;/, $3;
+          $x = 1 unless $x;    # ESC[;5H == ESC[1;5H ...etc
+          $y = 1 unless $y;
+          $self->{Out}->Cursor($x-1, $y-1);  # origin (0,0) in DOS console
+        }
+        elsif ($4 eq 's') {                      # ESC[s Saves cursor position for recall later
+          ($x, $y) = $self->{Out}->Cursor();
+          $self->{x} = $x;
+          $self->{y} = $y;
+        }
+        elsif ($4 eq 'u') {                      # ESC[u Return to saved cursor position
+          $self->{Out}->Cursor($self->{x}, $self->{y});
+        }
 
-      else {
-        print STDERR "\e$2$3$4 not implemented\n" if $DEBUG;  # ESC-code not implemented
+        else {
+          print STDERR "\e$2$3$4 not implemented\n" if $DEBUG;  # ESC-code not implemented
+        }
       }
+      else {
+        if ($4 eq 'U') {                         # ESC(U no mapping
+          $self->{conv} = 0;
+        }
+        elsif ($4 eq 'K') {                      # ESC(K mapping if it exist
+          $self->{Out}->OutputCP($OEM);      # restore original codepage
+          $self->{conv} = 1;
+        }
+        elsif ($4 eq 'X') {                      # ESC(#X codepage **EXPERIMENTAL**
+          $self->{conv} = 0;
+          $self->{Out}->OutputCP($3);
+        }
+        else {
+          print STDERR "\e$2$3$4 not implemented\n" if $DEBUG;  # ESC-code not implemented
+        }
+      }
+      # _PrintString($self, $5);
     }
     else {
-      if ($4 eq 'U') {                         # ESC(U no mapping
-        $self->{conv} = 0;
-      }
-      elsif ($4 eq 'K') {                      # ESC(K mapping if it exist
-        $self->{conv} = 1;
-      }
-      elsif ($4 eq 'X') {                      # ESC(#X codepage **EXPERIMENTAL**
-        $self->{conv} = 0;
-        $self->{Out}->OutputCP($3);
-      }
-      else {
-        print STDERR "\e$2$3$4 not implemented\n" if $DEBUG;  # ESC-code not implemented
-      }
+      $self->{Out}->Write(_conv($self, $s));
+      $s='';
     }
-    _PrintString($self, $5);
-  }
-  else {
-    $self->{Out}->Write(_conv($self, $s));
   }
 }
 
@@ -404,7 +411,7 @@ Win32::Console::ANSI - Perl extension to emulate ANSI console on Win32 system.
   print "\e[33;45;1mBold yellow on magenta.\e[0m\n";
   print "This text is normal.\n";
 
-With the Term::ANSIColor module one increases the readibility:
+With the Term::ANSIColor module one increases the readability:
 
   use Win32::Console::ANSI;
   use Term::ANSIColor;

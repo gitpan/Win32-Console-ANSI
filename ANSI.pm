@@ -1,8 +1,8 @@
 package Win32::Console::ANSI;
 #
-# Copyright (c) 2003 Jean-Louis Morel <jl_morel@bribes.org>
+# Copyright (c) 2004 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 0.04 (2003/10/09)
+# Version 0.05 (2004/02/26)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,13 +19,13 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 our $DEBUG = 0;
 
 # print overloading
 
 package Win32::Console::ANSI::IO;
-use Carp qw/croak/;
+# use Carp qw/carp/;
 use Win32::Console;
 use Win32API::Registry qw( :HKEY_ :KEY_ );
 
@@ -66,7 +66,13 @@ my %color = ( 30 => 0,                                               # black for
 
 sub new {
   my $self = bless {}, shift;
-  $self->{'Out'} = new Win32::Console(STD_OUTPUT_HANDLE);
+  $self->{handle} = shift;
+  if ($self->{handle} eq 'STDOUT') {
+    $self->{'Out'} = new Win32::Console(STD_OUTPUT_HANDLE);
+  }
+  else {
+    $self->{'Out'} = new Win32::Console(STD_ERROR_HANDLE);
+  }
   $self->{x} = 0;
   $self->{y} = 0;           # to save cursor position
   $self->{foreground} = 7;
@@ -81,8 +87,7 @@ sub new {
 
 sub _PrintString {
   my ($self, $s) = @_;
-  croak("Use of uninitialized value in print") unless defined $s;
-  while ($s) {
+  while ($s ne '') {
     my ($x, $y, $n);
     if ( $s =~ s/([^\e]*)?\e([\[(])([0-9\;\=]*)([a-zA-Z@])(.*)/$5/s ) {
       $self->{Out}->Write((_conv($self, $1)));
@@ -334,13 +339,39 @@ sub TIEHANDLE { shift->new(@_) }
 
 sub PRINT {
   my $self = shift;
-  $self->_PrintString($_) foreach @_;
+  my $s;
+  {
+    local $SIG{__WARN__} = sub {
+      warnings::warnif('uninitialized', "Use of uninitialized value in print")};
+    $s = join defined $,?$,:'', @_;
+  }
+  $self->_PrintString($s);
 }
 
 sub PRINTF {
   my $self = shift;
   my $format = shift;
-  $self->_PrintString(sprintf $format, @_)
+  my $s;
+  {
+    local $SIG{__WARN__} = sub {
+      warnings::warnif('uninitialized', "Use of uninitialized value in printf")};
+    $s = sprintf $format, @_;
+  }
+  $self->_PrintString($s);
+}
+
+sub CLOSE {
+  my $self = shift;
+  if ($self->{handle} eq 'STDOUT') {
+    no warnings;
+    untie *STDOUT;
+    close STDOUT;
+  }
+  else {
+    no warnings;
+    untie *STDERR;
+    close STDERR;
+  }
 }
 
 1;
@@ -351,50 +382,10 @@ sub PRINTF {
 
 package Win32::Console::ANSI;
 
-our @EXPORT = qw/ write select /;
-use subs qw/ write select /;
+# Create tied filehandles for print overloading.
 
-# overriding 'select' built-in function
-
-sub select {
-  if (@_) {
-    if ($_[0] eq 'STDOUT') {
-      CORE::select "Win32::Console::ANSI::NEW_OUT";
-    }
-    else {
-      CORE::select $_[0];
-    }
-  }
-  else {
-    CORE::select();
-  }
-}
-
-# overriding 'write' built-in function
-
-sub write {
-  if (@_) {
-    CORE::write $_[0];
-  }
-  else {
-    # print "1- \$~ = $~ \n\$^ = $^ \n";
-    my ($fn, $ftn, $np, $nlp, $ff, $lbc, $left) = ($~, $^, $%, $=, $^L, $:, $-);
-    my $old = CORE::select('STDOUT');
-    $~ = 'main::'.$fn if $fn ne 'NEW_OUT';
-    $^ = 'main::'.$ftn if $ftn ne 'NEW_OUT_TOP';
-    ($%, $=, $^L, $:, $-) = ($np, $nlp, $ff, $lbc, $left);
-    # print "2- \$~ = $~ \n\$^ = $^ \n";
-    CORE::write();
-    ($np, $left) = ($%, $-);
-    CORE::select($old);
-    ($%, $-) = ($np, $left);
-  }
-}
-
-# Create tied filehandle for print overloading.
-
-tie *NEW_OUT, 'Win32::Console::ANSI::IO';
-select "NEW_OUT";
+tie *STDOUT, 'Win32::Console::ANSI::IO', 'STDOUT';
+tie *STDERR, 'Win32::Console::ANSI::IO', 'STDERR';
 
 1;
 __END__
@@ -728,7 +719,7 @@ The method used to overload the print function is due to Matt Sergeant
 
 =head1 COPYRIGHT
 
-Copyright (c) 2003 J-L Morel. All rights reserved.
+Copyright (c) 2003-2004 J-L Morel. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

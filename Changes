@@ -24,3 +24,10 @@ Revision history for Perl extension Win32::Console::ANSI
 0.04  2003/10/09
   - bug: the printf function doesn't work as expected! -fixed.
     Thanks to Mark A. Rudolph to report this bug.
+    
+0.05  2004/02/26
+  - bug: the variable $, has no effect on print! -fixed.
+  - the module takes now the pragma -w and (use warnings) into account.
+  - bug: print '0' print nothing! -fixed
+    Thanks to Daniel Schoene to report this bug.
+

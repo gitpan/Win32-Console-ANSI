@@ -1,0 +1,14 @@
+Revision history for Perl extension Win32::Console::ANSI
+
+0.01  01/11/2002
+	- original version; created by h2xs 1.21 with options
+		-A -X -n Win32::ANSIConsole version 0.01 beta
+
+0.02  13/07/2003
+  - module renamed Win32::Console::ANSI for the CPAN (brian d foy)
+  - this module use now the module Encode for codepages conversion.
+    Thanks to Benjamin Goldberg for the suggestion.
+  - added more escape sequences for compatibility with Term::ANSIScreen.
+    Thanks to Autrijus Tang for the encouragements.
+  - fixed a bug about format. Thanks to Josh Spohr to report it.
+

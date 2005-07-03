@@ -43,4 +43,19 @@ Revision history for Perl extension Win32::Console::ANSI
   - added two auxiliary functions 'Title' and 'Cursor'.
   - improved the doc (limitations)
   
+1.00  2005/07/03
+  The module has been rewritten in C.  
+  By hooking the WriteFile API function in all the modules loaded by the 
+  script, it is possible to interpret the escape sequences just before they 
+  are written in the console.
+  This suppresses several previous versions limitations:  
+  - no tied handles (we can duplicate STDOUT or STDERR as usual and the 
+    module works now with IPC::Open2 and IPC::Open3)    
+  - the bug with the join method is fixed. We can use threads. 
+  - The conversion of the Windows codepage to the console codepage (ANSI to 
+    OEM conversion) is done by the internal Windows functions. The 
+    Encode module is not used anymore (the exe made with PAR are smaller).  
+  - The module is smaller and faster.
+  
+  
   

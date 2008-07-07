@@ -8,7 +8,13 @@
 #include <ImageHlp.h>
 #include <tlhelp32.h>
 
+#ifndef MIIM_BITMAP
+#error your SDK is too old... (see the README file in the distro)
+#endif
+
 // ========== Auxiliary debug function
+// See DebugView from SysInternals:
+// http://technet.microsoft.com/fr-fr/sysinternals/bb896647(en-us).aspx
 
 #define MYDEBUG 0
 
@@ -31,8 +37,15 @@ void DEBUGSTR( char * szFormat, ...) {  // sort of OutputDebugStringf
 #define MakePtr( cast, ptr, addValue ) (cast)( (DWORD)(ptr)+(DWORD)(addValue))
 
 HINSTANCE hDllInstance;       // Dll instance handle
+HWND hConWnd;                 // Console window handle
 HANDLE hConOut;               // handle to CONOUT$
 BOOL bIsWin9x;
+HMENU hSysMenu;               // handle to console system menu
+MENUITEMINFO CloseMenuItemInfo;      // close menu item
+int CloseMenuItemPos = -1;    // close menu item position
+                              // prototype for SetConsoleDisplayMode()
+typedef BOOL (WINAPI *SETCONDISPMODE)(HANDLE, DWORD, PCOORD);
+SETCONDISPMODE pfnSetConDispMode;
 
 #define ESC     '\x1B'        // ESCape character
 #define LF      '\x0A'        // Line Feed
@@ -869,7 +882,7 @@ ParseAndPrintString(HANDLE hDev,
       }
     }
 
-    else { // error: unknown automata state
+    else { // error: unknown automata state (never happens!)
       exit (1);
     }
   }
@@ -902,6 +915,42 @@ WINAPI MyWriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite,
                      lpOverlapped );
 }
 
+//-----------------------------------------------------------------------------
+//    GetConsoleHwnd()
+//  Returns a handle to the window used by the console associated with the
+//  calling process (like GetConsoleWindow for Win2000/XP/Vista).
+//  ( see : http://support.microsoft.com/kb/124103 )
+//-----------------------------------------------------------------------------
+
+HWND GetConsoleHwnd(void)
+{
+  HWND hwndFound;         // This is what is returned to the caller.
+  char pszNewWindowTitle[MAX_TITLE_SIZE]; // fabricated window title.
+  char pszOldWindowTitle[MAX_TITLE_SIZE]; // original window title.
+
+  GetConsoleTitle(pszOldWindowTitle, MAX_TITLE_SIZE);  // save original title
+
+  wsprintf(pszNewWindowTitle,"%d/%d",
+              GetTickCount(),
+              GetCurrentProcessId());  // Format a "unique" NewWindowTitle
+
+  SetConsoleTitle(pszNewWindowTitle);  // Change current window title
+
+  Sleep(10); // Ensure window title has been updated
+
+  hwndFound=FindWindow(NULL, pszNewWindowTitle); // Look for NewWindowTitle
+
+  SetConsoleTitle(pszOldWindowTitle);  // Restore original window title
+
+  Sleep(10); // Ensure window title has been updated
+
+  if ( hwndFound ) {    // last verification
+    GetWindowText(hwndFound, pszNewWindowTitle, MAX_TITLE_SIZE);
+    if ( strcmp(pszNewWindowTitle, pszOldWindowTitle) ) hwndFound = NULL;
+  }
+  return(hwndFound);
+}
+
 // ========== Initialisation
 
 //-----------------------------------------------------------------------------
@@ -913,12 +962,27 @@ WINAPI MyWriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite,
 BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
 	BOOL bResult = TRUE;
+	typedef HWND (WINAPI *GETCONWINH)(void);
+  GETCONWINH pfnGetConWinH;
 	switch( dwReason )
 	{
 		case DLL_PROCESS_ATTACH:
 		  hDllInstance = hInstance;  // save Dll instance handle
 		  DEBUGSTR("hDllInstance = 0x%.8x", hDllInstance);
-      hConOut = CreateFile(
+		    // To get the handle to the console window we use GetConsoleWindow() if
+		    // this function is available, otherwise we use our own function.
+		  pfnGetConWinH = (GETCONWINH)GetProcAddress( GetModuleHandle("Kernel32"),
+		                                              "GetConsoleWindow" );
+		  if ( pfnGetConWinH ) hConWnd = (*pfnGetConWinH)();  // Win2000/XP/Vista
+		  else hConWnd = GetConsoleHwnd(); 		                // Win9x
+		  DEBUGSTR("hConWnd = 0x%.8x", hConWnd);
+		  hSysMenu = GetSystemMenu(hConWnd, FALSE); // get handle to console system menu
+		  DEBUGSTR("hSysMenu = 0x%.8x", hSysMenu);
+		    // SetConsoleDisplayMode() is available only on WinXP/Vista...
+		  pfnSetConDispMode = (SETCONDISPMODE)GetProcAddress( GetModuleHandle("Kernel32"),
+		                                                      "SetConsoleDisplayMode" );
+		  DEBUGSTR("pfnSetConDispMode = 0x%.8x", pfnSetConDispMode);
+      hConOut = CreateFile(                     // get handle to CONOUT$
         "CONOUT$",
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -936,6 +1000,10 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 			break;
 
 		case DLL_PROCESS_DETACH:
+		  if ( CloseMenuItemPos != -1 && GetMenuItemID(hSysMenu, CloseMenuItemPos) != SC_CLOSE) {
+		    InsertMenuItem(hSysMenu, CloseMenuItemPos, MF_BYPOSITION, &CloseMenuItemInfo);
+        DrawMenuBar(hConWnd);
+		  }
       break;
 	}
   return (bResult);
@@ -944,7 +1012,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 // ========== Auxiliary functions
 
 MODULE = Win32::Console::ANSI		PACKAGE = Win32::Console::ANSI
-  
+
 PROTOTYPES: ENABLE
 
 # ---------------------------------------------------------
@@ -1082,6 +1150,114 @@ ScriptCP( ... )
   OUTPUT:
     RETVAL
 
+# ---------------------------------------------------------
+#    ShowConsoleWindow( state )
+#  Sets the specified console window''s show state
+# ---------------------------------------------------------
+
+int
+ShowConsoleWindow( state )
+    int state;
+  CODE:
+    if ( state<0 || state>10 )
+      croak("Bad state (= %d) in ShowConsoleWindow", state);
+    RETVAL = ShowWindow(hConWnd, state);
+  OUTPUT:
+    RETVAL
+
+# ---------------------------------------------------------
+#    MinimizeAll ( )
+#  Minimizes all the windows on the desktop.
+# ---------------------------------------------------------
+
+void
+MinimizeAll()
+  PPCODE:
+    keybd_event(VK_LWIN, 0, 0, 0);
+    keybd_event('M', 0, 0, 0);
+    keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+
+# ---------------------------------------------------------
+#    SetCloseButton ( )
+#  Enable/disable the close button [x] of the console window.
+# ---------------------------------------------------------
+
+int
+SetCloseButton( state )
+    int state
+  CODE:
+    int found;
+
+    for(found=0; found < GetMenuItemCount(hSysMenu); found++) {
+      if ( GetMenuItemID(hSysMenu, found) == SC_CLOSE ) break;
+    }
+    if ( found >= GetMenuItemCount(hSysMenu) ) found = -1;
+    DEBUGSTR("found = %d", found);
+
+    if ( state ) {    // enable close button
+      if (found != -1) RETVAL = 1;  // already enabled
+      else {
+        if ( CloseMenuItemPos == -1 ) RETVAL = 0; // error: no close menu to restore!
+        else {
+          RETVAL = InsertMenuItem(hSysMenu, CloseMenuItemPos, MF_BYPOSITION, &CloseMenuItemInfo);
+          DrawMenuBar(hConWnd);
+        }
+      }
+    }
+    else {            // disable close button
+      if (found == -1) RETVAL = 1;  // already disabled
+      else {
+        if ( CloseMenuItemPos == -1 ) {  //first time
+          CloseMenuItemInfo.cbSize = sizeof(MENUITEMINFO);
+	        CloseMenuItemInfo.fMask =  MIIM_BITMAP | MIIM_DATA | MIIM_ID | MIIM_STATE | MIIM_STRING;
+	        CloseMenuItemInfo.dwTypeData = NULL;    // buffer size needed (in .cch)
+	        GetMenuItemInfo(hSysMenu, SC_CLOSE, MF_BYCOMMAND, &CloseMenuItemInfo);
+	          // allocate the buffer for dwTypeData
+	        CloseMenuItemInfo.dwTypeData = LocalAlloc( LPTR, ++CloseMenuItemInfo.cch );
+            // save the close menu item in CloseMenuItemInfo
+          if (GetMenuItemInfo(hSysMenu, SC_CLOSE, MF_BYCOMMAND, &CloseMenuItemInfo) ) {
+            DEBUGSTR("dwTypeData=%s", CloseMenuItemInfo.dwTypeData);
+            CloseMenuItemPos = found;
+          }
+          else croak("Error: unable to save the close menu item");
+        }
+        RETVAL = DeleteMenu(hSysMenu, SC_CLOSE, MF_BYCOMMAND);
+	      DrawMenuBar(hConWnd);
+      }
+    }
+  OUTPUT:
+    RETVAL
+
+# ---------------------------------------------------------
+#    SetConsoleFullScreen ( )
+#  Sets the display mode of the specified console screen
+# ---------------------------------------------------------
+
+int
+SetConsoleFullScreen ( mode )
+    DWORD mode;
+  CODE:
+    COORD xydim;
+    mode = (mode)?1:2;
+    if ( pfnSetConDispMode )
+      RETVAL = (*pfnSetConDispMode)(hConOut, mode, &xydim);
+    else {
+      SetLastError(ERROR_INVALID_FUNCTION);
+      RETVAL = 0;
+    }
+  OUTPUT:
+    RETVAL
+
+# ---------------------------------------------------------
+#    SetMonitorState ( )
+#  Set the monitor state (on/off/standby)
+# ---------------------------------------------------------
+
+void
+SetMonitorState( state )
+    int state
+  PPCODE:
+    SendMessage(hConWnd, WM_SYSCOMMAND, SC_MONITORPOWER, state);
 
 # ---------------------------------------------------------
 # $buffer = _ScreenDump();
@@ -1137,4 +1313,9 @@ _chcp( new_Cp_In, new_Cp_Out )
     EXTEND(SP, 2);
     PUSHs(sv_2mortal(newSViv(old_Cp_In)));
     PUSHs(sv_2mortal(newSViv(old_Cp_Out)));
+
+
+
+
+
 

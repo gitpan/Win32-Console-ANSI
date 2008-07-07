@@ -22,10 +22,10 @@ my @dig;
 my $save = 0;
 
 if ($save) {
-  # open DIG, "> t\\04.data" or die $!;
+  # open DIG, "> t\\05.data" or die $!;
 }
 else {
-  open DIG, "t\\04.data" or die $!;
+  open DIG, "t\\05.data" or die $!;
   @dig = <DIG>;
   close DIG;
   chomp @dig;
@@ -162,7 +162,7 @@ comp(1);
 # ****************************** END TESTS
 
 if ($save) {
-  open DIG, "> t\\04.data" or die $!;
+  open DIG, "> t\\05.data" or die $!;
   local $, = "\n";
   print DIG @dig;
   close DIG;

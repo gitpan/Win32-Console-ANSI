@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2004 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 1.01 (08/06/2005)
+# Version 1.01 (19/07/2007)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,13 +19,41 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '1.00';
+our $VERSION = '1.01';
+
+use constant  MS_ON      => -1;
+use constant  MS_STANDBY => 1;
+use constant  MS_OFF     => 2;
+
+use constant  SW_HIDE            => 0;
+use constant  SW_NORMAL          => 1;
+use constant  SW_SHOWMINIMIZED   => 2;
+use constant  SW_SHOWMAXIMIZED   => 3;
+use constant  SW_MAXIMIZE        => 3;
+use constant  SW_SHOWNOACTIVATE  => 4;
+use constant  SW_SHOW            => 5;
+use constant  SW_MINIMIZE        => 6;
+use constant  SW_SHOWMINNOACTIVE => 7;
+use constant  SW_SHOWNA          => 8;
+use constant  SW_RESTORE         => 9;
+use constant  SW_SHOWDEFAULT     => 10;
 
 our %EXPORT_TAGS = (
-'all' => [ qw( Title Cursor XYMax SetConsoleSize Cls ScriptCP )],
+'func' => [ qw( Title Cursor XYMax SetConsoleSize Cls ScriptCP MinimizeAll SetMonitorState
+               ShowConsoleWindow SetCloseButton SetConsoleFullScreen )],
+'MS_' => [ qw( SetMonitorState MS_ON MS_OFF MS_STANDBY ) ],
+'SW_' => [ qw( MinimizeAll ShowConsoleWindow SW_HIDE SW_NORMAL SW_SHOWMINIMIZED
+               SW_SHOWMAXIMIZED SW_MAXIMIZE SW_SHOWNOACTIVATE SW_SHOW SW_MINIMIZE
+               SW_SHOWMINNOACTIVE SW_SHOWNA SW_RESTORE SW_SHOWDEFAULT ) ],
+'all' => [ qw( Title Cursor XYMax SetConsoleSize Cls ScriptCP MinimizeAll SetMonitorState
+               ShowConsoleWindow SetCloseButton SetConsoleFullScreen MS_ON MS_OFF MS_STANDBY
+               SW_HIDE SW_NORMAL SW_SHOWMINIMIZED SW_SHOWMAXIMIZED
+               SW_MAXIMIZE SW_SHOWNOACTIVATE SW_SHOW SW_MINIMIZE SW_SHOWMINNOACTIVE
+               SW_SHOWNA SW_RESTORE SW_SHOWDEFAULT )],
 );
 
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} },
+our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} }, @{ $EXPORT_TAGS{'MS_'} },
+                   @{ $EXPORT_TAGS{'SW_'} }, @{ $EXPORT_TAGS{'func'} },
 );
 
 our @EXPORT = qw(
@@ -84,11 +112,11 @@ And even more with Term::ANSIScreen:
 
 =head1 DESCRIPTION
 
-Windows NT/2000/XP does not support ANSI escape sequences in Win32 Console 
-applications. This module emulates an ANSI console for the script that uses 
-it and also converts the characters from Windows code page to DOS code page 
-(the so-called ANSI to OEM conversion). This conversion permits the display 
-of the accented characters in the console like in the Windows- based editor 
+Windows NT/2000/XP does not support ANSI escape sequences in Win32 Console
+applications. This module emulates an ANSI console for the script that uses
+it and also converts the characters from Windows code page to DOS code page
+(the so-called ANSI to OEM conversion). This conversion permits the display
+of the accented characters in the console like in the Windows- based editor
 used to type the script.
 
 =head2 Escape sequences for Cursor Movement
@@ -184,7 +212,7 @@ Clears the screen and moves the cursor to the home position (line 1, column 1).
 =back
 
 \e[J is equivalent to \e[0J. (Some terminal/emulators respond to \e[J as if
-it were \e[2J. Here, the default is 0; it's the norm)
+it were \e[2J. Here, the default is 0; it is the norm)
 
 =item * \e[#K
 
@@ -212,7 +240,7 @@ The cursor position is unchanged.
 =back
 
 \e[K is equivalent to \e[0K. (Some terminal/emulators respond to \e[K as if
-it were \e[2K. Here, the default is 0; it's the norm)
+it were \e[2K. Here, the default is 0; it is the norm)
 
 =item * \e[#L
 
@@ -308,23 +336,23 @@ Selects null mapping - straight to character from the codepage of the console.
 
 =item * \e(K
 
-Selects Windows to DOS mapping. This is the default mapping. It's useful 
-because one types the script with a Windows-based editor (using a Windows 
-codepage) and the script prints its messages on the console using another 
-codepage: without translation, the characters with a code greatest than 127 
+Selects Windows to DOS mapping. This is the default mapping. It is useful
+because one types the script with a Windows-based editor (using a Windows
+codepage) and the script prints its messages on the console using another
+codepage: without translation, the characters with a code greatest than 127
 are different and the printed messages may be not readable.
 
-The conversion is done by the Windows internal functions. 
-If a character cannot be represented in the console code page it is 
+The conversion is done by the Windows internal functions.
+If a character cannot be represented in the console code page it is
 replaced by a question mark character.
-    
+
 
 =item * \e(#X
 
-This escape sequence is I<not> standard! It's an experimental one, just for
+This escape sequence is I<not> standard! It is an experimental one, just for
 fun :-)
 
-If (I<and only if>) the console uses an Unicode police, it is possible to
+If (I<and only if>) the console uses a Unicode police, it is possible to
 change its codepage with this escape sequence. No effect with an ordinary
 "Raster Font". (For Windows NT/2000/XP the currently available Unicode
 console font is the Lucida Console TrueType font.)
@@ -334,7 +362,7 @@ console font is the Lucida Console TrueType font.)
 
 =head1 AUXILIARY FUNCTIONS
 
-Because the module exports no symbols into the callers namespace, it's
+Because the module exports no symbols into the callers namespace, it is
 necessary to import the names of the functions before using them.
 
 =over
@@ -342,12 +370,12 @@ necessary to import the names of the functions before using them.
 =item * Cls( );
 
 Clears the screen with the current background color, and set cursor to 
-(1,1). 
+(1,1).
 
 =item * $old_title = Title( [$new_title] );
 
-Gets and sets the title bar of the current console window. With no argument
-the title is not modified.
+Gets and sets the title bar of the current console window. With no 
+argument, the title is not modified.
 
   use Win32::Console::ANSI qw/ Title /;
   for (reverse 0..5) {
@@ -358,9 +386,9 @@ the title is not modified.
 =item * ($old_x, $old_y) = Cursor( [$new_x, $new_y] );
 
 Gets and sets the cursor position (the upper-left corner of the screen is
-at (1, 1)). With no arguments the cursor position is not modified. If one
+at (1, 1)). With no arguments, the cursor position is not modified. If one
 of the two coordinates $new_x or $new_y is 0, the corresponding
-coordinate doesn't change.
+coordinate does not change.
 
   use Win32::Console::ANSI qw/ Cursor /;
   ($x, $y) = Cursor();     # reads cursor position
@@ -373,7 +401,7 @@ coordinate doesn't change.
 =item * ($Xmax, $Ymax) = XYMax( );
 
 Gets the maximum cursor position.
-If C<($x, $y) = Cursor()> we have always C<1 E<lt>= $x E<lt>= $Xmax> and 
+If C<($x, $y) = Cursor()> we have always C<1 E<lt>= $x E<lt>= $Xmax> and
 C<1 E<lt>= $y E<lt>= $Ymax>.
 
 =item * $success = SetConsoleSize( $width, $height );
@@ -387,22 +415,216 @@ If the function succeeds, the return value is nonzero.
 If the function fails, the return value is zero and the extended error
 message is in C<$^E>.
 
+=item * ShowConsoleWindow( $state )
+
+Sets the console window's show state.
+
+The parameter C<$state> can be one of the following values:
+
+=over
+
+=item * SW_HIDE
+
+Hides the console window and activates another window.
+
+=item * SW_MAXIMIZE
+
+Maximizes the specified the console window.
+
+=item * SW_MINIMIZE
+
+Minimizes the console window and activates the next top-level window in the
+Z order.
+
+=item * SW_RESTORE
+
+Activates and displays the console window. If the console window is
+minimized or maximized, the system restores it to its original size and
+position. An application should specify this flag when restoring a
+minimized console window.
+
+=item * SW_SHOW
+
+Activates the console window and displays it in its current size and
+position.
+
+=item * SW_SHOWDEFAULT
+
+Sets the show state based on the SW_ value specified in the STARTUPINFO
+structure passed to the CreateProcess function by the program that started
+the application.
+
+=item * SW_SHOWMAXIMIZED
+
+Activates the console window and displays it as a maximized window.
+
+=item * SW_SHOWMINIMIZED
+
+Activates the window and displays it as a minimized window.
+
+=item * SW_SHOWMINNOACTIVE
+
+Displays the console window as a minimized window. This value is similar to
+SW_SHOWMINIMIZED, except the window is not activated.
+
+=item * SW_SHOWNA
+
+Displays the console window in its current size and position. This value is
+similar to SW_SHOW, except the window is not activated.
+
+=item * SW_SHOWNOACTIVATE
+
+Displays the console window in its most recent size and position. This value is
+similar to SW_NORMAL, except the window is not actived.
+
+=item * SW_NORMAL
+
+Activates and displays the console window. If the window is minimized or
+maximized, the system restores it to its original size and position.
+
+=back
+
+If the console window was previously visible, the return value is nonzero.
+
+If the console window was previously hidden, the return value is zero.
+
+=item * MinimizeAll( )
+
+Minimizes all the windows on the desktop.
+
+Example:
+
+    #!/usr/bin/perl -w
+    use strict;
+    use Win32::Console::ANSI qw/ :SW_ /;
+
+    MinimizeAll();
+    sleep 2;
+    ShowConsoleWindow(SW_SHOWMAXIMIZED);
+    sleep 2;
+    ShowConsoleWindow(SW_HIDE);
+    sleep 2;
+    ShowConsoleWindow(SW_RESTORE);
+
+=item * $sucess = SetCloseButton( $state )
+
+C<SetCloseButton( 0 )> disables the close button C<[x]> of the console
+window and deletes the CLOSE menu item from the console menu system.
+
+C<SetCloseButton( 1 )> enables the close button C<[x]> of the console window
+and restores the CLOSE menu item from the console menu system.
+
+If the function succeeds, the return value is nonzero else, the return value
+is zero.
+
+For obvious reasons, the button is re-established and the menu restored at
+the end of the script.
+
+Example:
+
+    #!/usr/bin/perl -w
+    use strict;
+    use Win32::Console::ANSI qw/ SetCloseButton /;
+
+    $SIG{INT}='IGNORE';   # no Ctrl-C interrupt
+    SetCloseButton(0);    # no close button
+
+    print "No close button, no Ctrl-C interrupt\n",
+          "  Press [Enter]...\n";
+    do { $_ = <STDIN> } until defined;
+
+    $SIG{INT}='';         # Ctrl-C interrupt
+    print "No close button, Ctrl-C interrupt enabled\n",
+          "  Press [Enter]...\n";
+    do { $_ = <STDIN> } until defined;
+
+    SetCloseButton(1);      # restore close button
+    print "Close button available\n  Press [Enter]...\n";                     
+    do { $_ = <STDIN> } until defined;
+
+=item * $success = SetConsoleFullScreen( $mode )
+
+Sets the console in full-screen or windowed mode. This function works only 
+on WinXP/Vista...
+
+C<SetConsoleFullScreen( 1 )> sets the console in full-screen mode.
+
+C<SetConsoleFullScreen( 0 )> sets the console in windowed mode.
+
+If the function succeeds, the return value is nonzero. If the function 
+fails, the return value is zero and the extended error message is in 
+C<$^E>).
+
+=item * SetMonitorState( $state )
+
+Sets the monitor state (on / off / standby).
+
+The parameter C<$state> can be one of the following constants:
+
+=over
+
+=item * MS_ON
+
+The display is being turn-on.
+
+=item * MS_STANDBY
+
+The display is going to low power.
+
+=item * MS_OFF
+
+The display is being shut off.
+
+=back
+
+Example:
+
+    #!/usr/bin/perl -w
+    use strict;
+    use Win32::Console::ANSI qw/ :MS_ /;
+
+    SetMonitorState(MS_STANDBY);
+    sleep 10;                    # standby for 10 sec
+    SetMonitorState(MS_ON);
+
+
 =item * $old_ACP = ScriptCP( [$new_ACP] );
 
-Set the codepage of the script and return the old value.
+Sets the codepage of the script and return the old value.
+
+=back
+
+=head1 EXPORTS
+
+Nothing by default;
+the function names and constants must be explicitly exported.
+
+=head2 Export Tags:
+
+=over
+
+=item * :func
+
+exports all the functions.
+
+=item * :MS_
+
+exports C<SetMonitorState> and the C<MS_*> constants.
+
+=item * :SW_
+
+exports C<MinimizeAll>, C<ShowConsoleWindow> and the C<SW_*> constants
+
+=item * :all
+
+exports all.
 
 =back
 
 =head1 LIMITATIONS
 
-=over
-
-=item *
-
 Due to DOS-console limitations, the blink mode (text attributes 5 and 25) is
 not implemented.
-
-=back
 
 =head1 SEE ALSO
 
@@ -414,9 +636,11 @@ J-L Morel E<lt>jl_morel@bribes.orgE<gt>
 
 Home page: http://www.bribes.org/perl/wANSIConsole.html
 
+Report bug: http://rt.cpan.org/Public/Dist/Display.html?Name=Win32-Console-ANSI
+
 =head1 COPYRIGHT
 
-Copyright (c) 2003-2005 J-L Morel. All rights reserved.
+Copyright (c) 2003-2007 J-L Morel. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

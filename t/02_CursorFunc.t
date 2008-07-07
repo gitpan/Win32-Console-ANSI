@@ -17,11 +17,11 @@ my $send  = Win32::Event->new(1, 0, 'MessageAvailable');
 my $ProcessObj;
 Win32::Process::Create($ProcessObj,
                        "$^X",
-                       "perl -I$INC[0] -I$INC[1] t\\03_DisplayEdition.pl",
+                       "perl -I$INC[0] -I$INC[1] t\\02_CursorFunc.pl",
                        0,
                        NORMAL_PRIORITY_CLASS | CREATE_NEW_CONSOLE,
                        ".") or die $^E;
-
+                       
 my $Response;
 while(1) {
   $ready->set();
@@ -33,3 +33,4 @@ while(1) {
 }
   
 __END__
+

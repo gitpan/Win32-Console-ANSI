@@ -26,10 +26,10 @@ my @dig;
 my $save = 0;
 
 if ($save) {
-  # open DIG, "> t\\07.data" or die $!;
+  # open DIG, "> t\\09.data" or die $!;
 }
 else {
-  open DIG, "t\\07.data" or die $!;
+  open DIG, "t\\09.data" or die $!;
   @dig = <DIG>;
   close DIG;
   chomp @dig;
@@ -170,7 +170,7 @@ if ($ANSIScreenOk) {
   # ****************************** END TESTS
   
   if ($save) {
-    open DIG, "> t\\07.data" or die $!;
+    open DIG, "> t\\09.data" or die $!;
     local $, = "\n";
     print DIG @dig;
     close DIG;

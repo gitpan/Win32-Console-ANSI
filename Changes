@@ -57,5 +57,12 @@ Revision history for Perl extension Win32::Console::ANSI
     Encode module is not used anymore (the exe made with PAR are smaller).  
   - The module is smaller and faster.
   
+1.01  2008/07/07
+  Just added some auxiliary functions
+  - ShowConsoleWindow: changes the console window's show state (hide, max, min...),
+  - MinimizeAll: minimizes all the windows on the desktop,
+  - SetCloseButton: enables/disables the close button [x] of the console window,
+  - SetConsoleFullScreen: sets the console in full-screen or windowed mode (WinXP/Vista)
+  - SetMonitorState: sets the monitor state (on/off/standby).
   
   

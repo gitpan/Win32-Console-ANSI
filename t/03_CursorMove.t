@@ -17,7 +17,7 @@ my $send  = Win32::Event->new(1, 0, 'MessageAvailable');
 my $ProcessObj;
 Win32::Process::Create($ProcessObj,
                        "$^X",
-                       "perl -I$INC[0] -I$INC[1] t\\07_Compatibility2.pl",
+                       "perl -I$INC[0] -I$INC[1] t\\03_CursorMove.pl",
                        0,
                        NORMAL_PRIORITY_CLASS | CREATE_NEW_CONSOLE,
                        ".") or die $^E;

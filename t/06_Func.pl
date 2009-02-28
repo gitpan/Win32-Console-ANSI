@@ -1,7 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
-use Win32::Clipboard;
-use Win32::Event;
+use Win32::Pipe;
 use Win32::Console::ANSI qw( :all );
 
 close STDOUT;                 # needed for Win9x
@@ -10,24 +9,17 @@ binmode STDOUT;
 select STDOUT;
 $|++;
 
-my $clip  = Win32::Clipboard();
-my $ready = Win32::Event->open('ReadyToReadClipboad');
-my $send  = Win32::Event->open('MessageAvailable');
+my $npipe = new Win32::Pipe("\\\\.\\pipe\\ANSINamedPipe", 1) or die $^E;
 my $n;
 
 sub ok {
-  my $t = shift;
-  ++$n;
-  $ready->wait();
-  $clip->Set($t ? "ok $n\n":"not ok $n\n");
-  $ready->reset();
-  $send->set();
+  $n++;
+  $npipe->Read();
+  $npipe->Write($_[0] ? "ok $n\n":"not ok $n\n");
 }
 
-$ready->wait();
-$clip->Set("1..22\n");        # <== test plan
-$ready->reset();
-$send->set();
+$npipe->Read();
+$npipe->Write("1..22\n");        # <== test plan
 
 # ====== BEGIN TESTS
 
@@ -125,9 +117,7 @@ ok(1);
 
 # ====== END TESTS
 
-$ready->wait();
-$clip->Set("_OVER");
-$ready->reset();
-$send->set();
+$npipe->Read();
+$npipe->Write("_OVER");
 
 __END__

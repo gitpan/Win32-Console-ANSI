@@ -1,8 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
-use Win32::Clipboard;
-use Win32::Event;
-use Win32::Console::ANSI qw( Cls Cursor Title XYMax SetConsoleSize);
+use Win32::Pipe;
+use Win32::Console::ANSI qw( Cls Cursor Title XYMax SetConsoleSize );
 use Digest::MD5 qw(md5_hex);
 # module Term::ANSIScreen installed ?
 my $ANSIScreenOk;
@@ -15,9 +14,7 @@ binmode STDOUT;
 select STDOUT;
 $|++;
 
-my $clip  = Win32::Clipboard();
-my $ready = Win32::Event->open('ReadyToReadClipboad');
-my $send  = Win32::Event->open('MessageAvailable');
+my $npipe = new Win32::Pipe("\\\\.\\pipe\\ANSINamedPipe", 1) or die $^E;
 my $n;
 
 my $s;
@@ -38,18 +35,14 @@ else {
 sub ok {
   my $t = shift;
   ++$n;
-  $ready->wait();
-  $clip->Set($t ? "ok $n\n":"not ok $n\n");
-  $ready->reset();
-  $send->set();
+  $npipe->Read();
+  $npipe->Write($t ? "ok $n\n":"not ok $n\n");
 }
 
 sub skipped {
   ++$n;
-  $ready->wait();
-  $clip->Set("ok $n # skip");
-  $ready->reset();
-  $send->set();
+  $npipe->Read();
+  $npipe->Write("ok $n # skip\n");
 }
 
 sub comp {            # compare screendump MD5 digests
@@ -69,19 +62,16 @@ sub comp {            # compare screendump MD5 digests
     }
   }
   else {
-    $ready->wait();
-    my $dig = shift @dig;
-    $clip->Set($digest eq $dig ? "ok $n\n":"not ok $n\n");
-    $ready->reset();
-    $send->set();  
+    $npipe->Read();
+    my $dig = shift @dig;    
+    $npipe->Write($digest eq $dig ? "ok $n\n":"not ok $n\n");
   }
 }
 
-$ready->wait();
 if ($ANSIScreenOk) {
-  $clip->Set("1..12\n");        # <================= test plan
-  $ready->reset();
-  $send->set();
+  $npipe->Read();
+  $npipe->Write("1..12\n");        # <================= test plan
+  
   
   # ****************************** BEGIN TESTS
   
@@ -177,13 +167,11 @@ if ($ANSIScreenOk) {
   }
 }
 else {
-  $clip->Set("1..0 # Skipped: Term::ANSIScreen not installed\n");
-  $ready->reset();
-  $send->set();
+  $npipe->Read();
+  $npipe->Write("1..0 # skip Term::ANSIScreen not installed\n");
 }
-$ready->wait();
-$clip->Set("_OVER");
-$ready->reset();
-$send->set();
+
+$npipe->Read();
+$npipe->Write("_OVER");
 
 __END__

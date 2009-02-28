@@ -1,10 +1,8 @@
 #!/usr/bin/perl -w
 use strict;
-use Win32::Clipboard;
-use Win32::Event;
-use Win32::Console::ANSI qw( Cls Cursor Title XYMax SetConsoleSize);
+use Win32::Pipe;
+use Win32::Console::ANSI qw( Cls Cursor Title XYMax SetConsoleSize );
 use Digest::MD5 qw(md5_hex);
-
 
 close STDOUT;                 # needed for Win9x
 open STDOUT, '+> CONOUT$';
@@ -12,9 +10,7 @@ binmode STDOUT;
 select STDOUT;
 $|++;
 
-my $clip  = Win32::Clipboard();
-my $ready = Win32::Event->open('ReadyToReadClipboad');
-my $send  = Win32::Event->open('MessageAvailable');
+my $npipe = new Win32::Pipe("\\\\.\\pipe\\ANSINamedPipe", 1) or die $^E;
 my $n;
 
 my $s;
@@ -49,17 +45,13 @@ sub comp {            # compare screendump MD5 digests
     }
   }
   else {
-    $ready->wait();
-    $clip->Set($digest eq $dig[$n-1] ? "ok $n\n":"not ok $n\n");
-    $ready->reset();
-    $send->set();  
+    $npipe->Read();
+    $npipe->Write($digest eq $dig[$n-1] ? "ok $n\n":"not ok $n\n");
   }
 }
 
-$ready->wait();
-$clip->Set("1..3\n");        # <================= test plan
-$ready->reset();
-$send->set();
+$npipe->Read();
+$npipe->Write("1..3\n");        # <================= test plan
 
 # ****************************** BEGIN TESTS
 
@@ -145,10 +137,8 @@ if ($save) {
   print DIG @dig;
   close DIG;
 }
-$ready->wait();
-$clip->Set("_OVER");
-$ready->reset();
-$send->set();
+
+$npipe->Read();
+$npipe->Write("_OVER");
 
 __END__
-

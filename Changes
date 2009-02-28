@@ -24,13 +24,13 @@ Revision history for Perl extension Win32::Console::ANSI
 0.04  2003/10/09
   - bug: the printf function doesn't work as expected! -fixed.
     Thanks to Mark A. Rudolph to report this bug.
-    
+
 0.05  2004/02/26
   - bug: the variable $, has no effect on print! -fixed.
   - the module takes now the pragma -w and (use warnings) into account.
   - bug: print '0' print nothing! -fixed
     Thanks to Daniel Schoene to report this bug.
-    
+
 0.06  2004/09/20
   - bug: with \e[#K, if the cursor is on the last line of the console,
          a new line is added. -fixed.
@@ -42,21 +42,21 @@ Revision history for Perl extension Win32::Console::ANSI
     Request from Phoeares Tsai.
   - added two auxiliary functions 'Title' and 'Cursor'.
   - improved the doc (limitations)
-  
+
 1.00  2005/07/03
-  The module has been rewritten in C.  
-  By hooking the WriteFile API function in all the modules loaded by the 
-  script, it is possible to interpret the escape sequences just before they 
+  The module has been rewritten in C.
+  By hooking the WriteFile API function in all the modules loaded by the
+  script, it is possible to interpret the escape sequences just before they
   are written in the console.
-  This suppresses several previous versions limitations:  
-  - no tied handles (we can duplicate STDOUT or STDERR as usual and the 
-    module works now with IPC::Open2 and IPC::Open3)    
-  - the bug with the join method is fixed. We can use threads. 
-  - The conversion of the Windows codepage to the console codepage (ANSI to 
-    OEM conversion) is done by the internal Windows functions. The 
-    Encode module is not used anymore (the exe made with PAR are smaller).  
+  This suppresses several previous versions limitations:
+  - no tied handles (we can duplicate STDOUT or STDERR as usual and the
+    module works now with IPC::Open2 and IPC::Open3)
+  - the bug with the join method is fixed. We can use threads.
+  - The conversion of the Windows codepage to the console codepage (ANSI to
+    OEM conversion) is done by the internal Windows functions. The
+    Encode module is not used anymore (the exe made with PAR are smaller).
   - The module is smaller and faster.
-  
+
 1.01  2008/07/07
   Just added some auxiliary functions
   - ShowConsoleWindow: changes the console window's show state (hide, max, min...),
@@ -64,5 +64,9 @@ Revision history for Perl extension Win32::Console::ANSI
   - SetCloseButton: enables/disables the close button [x] of the console window,
   - SetConsoleFullScreen: sets the console in full-screen or windowed mode (WinXP/Vista)
   - SetMonitorState: sets the monitor state (on/off/standby).
-  
-  
+
+1.02  2009/02/28
+  - Tests rewritten using Win32::Pipe for IPC.
+  - Adding dependencies in the Makefile (thanks to Dominique Goncalves).
+  - bug with Windows Vista64 + SP1 (RT#43592 and RT#43639) -fixed
+    (thanks to Sisyphus)

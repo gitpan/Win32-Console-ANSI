@@ -105,7 +105,6 @@ UINT SaveCP;
 COORD SavePos = {0, 0};
 
 
-
 // ========== Hooking API functions
 //
 // References about API hooking (and dll injection):
@@ -132,12 +131,6 @@ BOOL HookAPIOneMod(
   PIMAGE_IMPORT_DESCRIPTOR  pImportDesc;
   PIMAGE_THUNK_DATA         pThunk;
 
-  // Verify that a valid pfn was passed
-  if ( IsBadCodePtr(pfnNewFunction) ) {
-    DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
-    return FALSE;
-  }
-
   // Verify that the module and function names passed are valid
   pfnOldFunction = GetProcAddress( GetModuleHandle(pszFunctionModule),
                                    pszOldFunctionName );
@@ -149,10 +142,6 @@ BOOL HookAPIOneMod(
 
   // Tests to make sure we're looking at a module image (the 'MZ' header)
   pDosHeader = (PIMAGE_DOS_HEADER)hFromModule;
-  if ( IsBadReadPtr(pDosHeader, sizeof(IMAGE_DOS_HEADER)) ) {
-    DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
-    return FALSE;
-  }
   if ( pDosHeader->e_magic != IMAGE_DOS_SIGNATURE ) {
     DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
     return FALSE;
@@ -161,11 +150,7 @@ BOOL HookAPIOneMod(
   // The MZ header has a pointer to the PE header
   pNTHeader = MakePtr(PIMAGE_NT_HEADERS, pDosHeader, pDosHeader->e_lfanew);
 
-  // More tests to make sure we're looking at a "PE" image
-  if ( IsBadReadPtr(pNTHeader, sizeof(IMAGE_NT_HEADERS)) ) {
-    DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
-    return FALSE;
-  }
+  // One more test to make sure we're looking at a "PE" image
   if ( pNTHeader->Signature != IMAGE_NT_SIGNATURE ) {
     DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
     return FALSE;
@@ -219,7 +204,10 @@ BOOL HookAPIOneMod(
       flNewProtect |= (PAGE_READWRITE);
       // Change the access protection on the region of committed pages in the
       // virtual address space of the current process
-      VirtualProtect(&pThunk->u1.Function, sizeof(PVOID), flNewProtect, &flOldProtect );
+      if( !VirtualProtect(&pThunk->u1.Function, sizeof(PVOID), flNewProtect, &flOldProtect )) {
+        DEBUGSTR("...No access (LastError=%d)", GetLastError());
+        return TRUE;  // forbiden access - it's ok
+      }
 
       // Overwrite the original address with the address of the new function
       if ( !WriteProcessMemory(GetCurrentProcess(),
@@ -269,8 +257,8 @@ BOOL HookAPIAllMod(
 
   // Walk the module list of the modules
   for (fOk = Module32First(hModuleSnap, &me); fOk; fOk = Module32Next(hModuleSnap, &me) ) {
-    // We don't hook functions in our own module
-    if (me.hModule != hDllInstance) {
+    // Hooking into the C runtime library
+    if ( strstr(me.szModule, "MSVC") != NULL || strstr(me.szModule, "msvc") != NULL ) {
       DEBUGSTR("Hooking in %s", me.szModule);
       // Hook this function in this module
       if (!HookAPIOneMod(me.hModule, pszFunctionModule, pszOldFunctionName, pfnNewFunction) ) {

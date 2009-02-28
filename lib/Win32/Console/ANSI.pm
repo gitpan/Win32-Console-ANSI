@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2004 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 1.01 (19/07/2007)
+# Version 1.02 (25/02/2009)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,7 +19,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 use constant  MS_ON      => -1;
 use constant  MS_STANDBY => 1;
@@ -429,7 +429,7 @@ Hides the console window and activates another window.
 
 =item * SW_MAXIMIZE
 
-Maximizes the specified the console window.
+Maximizes the console window.
 
 =item * SW_MINIMIZE
 
@@ -625,6 +625,8 @@ exports all.
 
 Due to DOS-console limitations, the blink mode (text attributes 5 and 25) is
 not implemented.
+
+
 
 =head1 SEE ALSO
 

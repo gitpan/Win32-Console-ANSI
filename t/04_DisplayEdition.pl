@@ -1,7 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
-use Win32::Clipboard;
-use Win32::Event;
+use Win32::Pipe;
 use Win32::Console::ANSI qw( Cls Cursor Title XYMax SetConsoleSize);
 use Digest::MD5 qw(md5_hex);
 
@@ -11,11 +10,8 @@ binmode STDOUT;
 select STDOUT;
 $|++;
 
-my $clip  = Win32::Clipboard();
-my $ready = Win32::Event->open('ReadyToReadClipboad');
-my $send  = Win32::Event->open('MessageAvailable');
+my $npipe = new Win32::Pipe("\\\\.\\pipe\\ANSINamedPipe", 1) or die $^E;
 my $n;
-
 my $s;
 my $dig;
 my @dig;
@@ -31,13 +27,10 @@ else {
   chomp @dig;
 }
 
-
 sub skipped {
   ++$n;
-  $ready->wait();
-  $clip->Set("ok $n # skip");
-  $ready->reset();
-  $send->set();
+  $npipe->Read();
+  $npipe->Write("ok $n # skip");
 }
 
 sub comp {
@@ -57,17 +50,13 @@ sub comp {
     }
   }
   else {
-    $ready->wait();
-    $clip->Set($digest eq $dig[$n-1] ? "ok $n\n":"not ok $n\n");
-    $ready->reset();
-    $send->set();  
+    $npipe->Read();
+    $npipe->Write($digest eq $dig[$n-1] ? "ok $n\n":"not ok $n\n");
   }
 }
 
-$ready->wait();
-$clip->Set("1..74\n");        # <== test plan
-$ready->reset();
-$send->set();
+$npipe->Read();
+$npipe->Write("1..74\n");        # <== test plan
 
 # ****************************** BEGIN TESTS
 
@@ -733,10 +722,7 @@ if ($save) {
   close DIG;
 }
 
-$ready->wait();
-$clip->Set("_OVER");
-$ready->reset();
-$send->set();
-
+$npipe->Read();
+$npipe->Write("_OVER");
 
 __END__

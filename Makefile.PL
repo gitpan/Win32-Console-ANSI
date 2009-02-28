@@ -13,7 +13,10 @@ BEGIN {
 WriteMakefile(
   NAME         => 'Win32::Console::ANSI',
   VERSION_FROM => 'lib/Win32/Console/ANSI.pm',    # finds $VERSION
-  PREREQ_PM    => {},                             # e.g., Module::Name => 1.1
+  PREREQ_PM    => { 
+                   Win32::Pipe => 0,
+                   Win32::Process => 0,
+    },                             # e.g., Module::Name => 1.1
   ( $] >= 5.005
     ?    ## Add these new keywords supported since 5.005
       (

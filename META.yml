@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Win32-Console-ANSI
-version:            1.02
+version:            1.03
 abstract:           Perl extension to emulate ANSI console on Win32 system.
 author:
     - J-L. Morel <jl_morel@bribes.org>

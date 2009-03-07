@@ -34,7 +34,7 @@ void DEBUGSTR( char * szFormat, ...) {  // sort of OutputDebugStringf
 // ========== Global variables and constants
 
 // Macro for adding pointers/DWORDs together without C arithmetic interfering
-#define MakePtr( cast, ptr, addValue ) (cast)( (DWORD)(ptr)+(DWORD)(addValue))
+#define MakePtr( cast, ptr, addValue ) (cast)( (__int64)(ptr)+(DWORD)(addValue))
 
 HINSTANCE hDllInstance;       // Dll instance handle
 HWND hConWnd;                 // Console window handle
@@ -189,8 +189,7 @@ BOOL HookAPIOneMod(
   // Blast through the table of import addresses, looking for the one
   // that matches the address we got back from GetProcAddress above.
   while ( pThunk->u1.Function ) {
-         // double cast avoid warning with VC6 and VC7 :-)
-    if ( (DWORD) pThunk->u1.Function == (DWORD)pfnOldFunction ) { // We found it!
+    if ( (PROC) pThunk->u1.Function == pfnOldFunction ) { // We found it!
       DWORD flOldProtect, flNewProtect, flDummy;
       MEMORY_BASIC_INFORMATION mbi;
 
@@ -206,7 +205,7 @@ BOOL HookAPIOneMod(
       // virtual address space of the current process
       if( !VirtualProtect(&pThunk->u1.Function, sizeof(PVOID), flNewProtect, &flOldProtect )) {
         DEBUGSTR("...No access (LastError=%d)", GetLastError());
-        return TRUE;  // forbiden access - it's ok
+        return FALSE;
       }
 
       // Overwrite the original address with the address of the new function
@@ -1077,12 +1076,12 @@ char *
 Title( ... )
   CODE:
     char * old_title;
-    int len;
+    size_t len;
     New(0, old_title, MAX_TITLE_SIZE, char);
     GetConsoleTitle(old_title, MAX_TITLE_SIZE);
     if (items > 1)
       croak("Usage: Title( [new_title] )");
-    else if (items ==1 )
+    else if (items == 1 )
       SetConsoleTitle( SvPV(ST(0), len) );
   RETVAL = old_title;
   OUTPUT:
@@ -1134,7 +1133,7 @@ ScriptCP( ... )
       croak("Usage: ScriptCP( [codepage] )");
     RETVAL = Cp_In;
     if (items ==1 )
-      Cp_In = SvIV(ST(0));
+      Cp_In = (UINT) SvIV(ST(0));
   OUTPUT:
     RETVAL
 

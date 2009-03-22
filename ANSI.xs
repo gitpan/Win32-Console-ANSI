@@ -34,30 +34,30 @@ void DEBUGSTR( char * szFormat, ...) {  // sort of OutputDebugStringf
 // ========== Global variables and constants
 
 // Macro for adding pointers/DWORDs together without C arithmetic interfering
-#define MakePtr( cast, ptr, addValue ) (cast)( (__int64)(ptr)+(DWORD)(addValue))
+#define MakePtr( cast, ptr, addValue ) (cast)( (unsigned __int64)(ptr)+(DWORD)(addValue))
 
-HINSTANCE hDllInstance;       // Dll instance handle
-HWND hConWnd;                 // Console window handle
-HANDLE hConOut;               // handle to CONOUT$
+HINSTANCE hDllInstance;         // Dll instance handle
+HWND hConWnd;                   // Console window handle
+HANDLE hConOut;                 // handle to CONOUT$
 BOOL bIsWin9x;
-HMENU hSysMenu;               // handle to console system menu
-MENUITEMINFO CloseMenuItemInfo;      // close menu item
-int CloseMenuItemPos = -1;    // close menu item position
-                              // prototype for SetConsoleDisplayMode()
+HMENU hSysMenu;                 // handle to console system menu
+MENUITEMINFO CloseMenuItemInfo; // close menu item
+int CloseMenuItemPos = -1;      // close menu item position
+                                // prototype for SetConsoleDisplayMode()
 typedef BOOL (WINAPI *SETCONDISPMODE)(HANDLE, DWORD, PCOORD);
 SETCONDISPMODE pfnSetConDispMode;
 
-#define ESC     '\x1B'        // ESCape character
-#define LF      '\x0A'        // Line Feed
+#define ESC     '\x1B'          // ESCape character
+#define LF      '\x0A'          // Line Feed
 
-#define MAX_TITLE_SIZE 1024   // max title string console size
+#define MAX_TITLE_SIZE 1024     // max title string console size
 
-#define MAX_ARG 16            // max number of args in an escape sequence
-int state;                    // automata state
-char prefix;                  // escape sequence prefix ( '[' or '(' );
-char suffix;                  // escape sequence suffix
-int es_argc;                  // escape sequence args count
-int es_argv[MAX_ARG];         // escape sequence args
+#define MAX_ARG 16              // max number of args in an escape sequence
+int state;                      // automata state
+char prefix;                    // escape sequence prefix ( '[' or '(' );
+char suffix;                    // escape sequence suffix
+int es_argc;                    // escape sequence args count
+int es_argv[MAX_ARG];           // escape sequence args
 
 // color constants
 
@@ -193,6 +193,7 @@ BOOL HookAPIOneMod(
       DWORD flOldProtect, flNewProtect, flDummy;
       MEMORY_BASIC_INFORMATION mbi;
 
+	  DEBUGSTR("Found !\n");
       // Get the current protection attributes
       VirtualQuery(&pThunk->u1.Function, &mbi, sizeof(mbi));
       // Take the access protection flags
@@ -227,6 +228,99 @@ BOOL HookAPIOneMod(
 }
 
 //-----------------------------------------------------------------------------
+//   SearchModFunc
+// Search the name of the module that export a msvcr*.dll function
+// Return a pointer to the module name on success and NULL on error.
+//
+// Note: on "old" Windows, the 'WriteFile' function is exported by kernel32.dll.
+// With Windows 7, this function is exported by API-MS-Win-Core-File-L1-1-0.dll
+// So it is necessary to find the good dll to hook.
+//-----------------------------------------------------------------------------
+
+PSTR SearchModFunc(
+    PSTR  pszOldFunctionName     // Function name to search
+    )
+{
+  HANDLE          hModuleSnap = NULL;
+  MODULEENTRY32   me        = {0};
+  BOOL fOk;
+  PIMAGE_DOS_HEADER         pDosHeader;
+  PIMAGE_NT_HEADERS         pNTHeader;
+  PIMAGE_IMPORT_DESCRIPTOR  pImportDesc;
+  PIMAGE_THUNK_DATA         pThunk;
+  PIMAGE_IMPORT_BY_NAME     pImportByName;
+  PSTR                      pszModName;
+
+  // Take a snapshot of all modules in the current process.
+  hModuleSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
+
+  if (hModuleSnap == (HANDLE)-1) {
+    DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
+	  return NULL;
+  }
+
+  // Fill the size of the structure before using it.
+  me.dwSize = sizeof(MODULEENTRY32);
+
+  // Walk the module list of the modules
+  for (fOk = Module32First(hModuleSnap, &me); fOk; fOk = Module32Next(hModuleSnap, &me) ) {
+	if ( strstr(me.szModule, "MSVC") != NULL || strstr(me.szModule, "msvc") != NULL ) {
+	  pDosHeader = (PIMAGE_DOS_HEADER) me.hModule;
+      if ( pDosHeader->e_magic != IMAGE_DOS_SIGNATURE ) {
+        DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
+		    CloseHandle (hModuleSnap);
+		    return NULL;
+      }
+
+      // The MZ header has a pointer to the PE header
+      pNTHeader = MakePtr(PIMAGE_NT_HEADERS, pDosHeader, pDosHeader->e_lfanew);
+
+      // One more test to make sure we're looking at a "PE" image
+      if ( pNTHeader->Signature != IMAGE_NT_SIGNATURE ) {
+        DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
+		    CloseHandle (hModuleSnap);
+		    return NULL;
+      }
+
+      // We know have a valid pointer to the module's PE header.
+      // Get a pointer to its imports section
+      pImportDesc = MakePtr(PIMAGE_IMPORT_DESCRIPTOR,
+                            pDosHeader,
+                            pNTHeader->OptionalHeader.
+                              DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].
+                              VirtualAddress);
+
+      // Bail out if the RVA of the imports section is 0 (it doesn't exist)
+      if ( pImportDesc == (PIMAGE_IMPORT_DESCRIPTOR)pNTHeader ) {
+	      CloseHandle (hModuleSnap);
+		    return NULL;
+      }
+
+      // Iterate through the array of imported module descriptors
+      while ( pImportDesc->Name ) {
+        pszModName = MakePtr(PSTR, pDosHeader, pImportDesc->Name);
+		    // Get a pointer to the curent module's Import Name Table (INT)
+        pThunk = MakePtr(PIMAGE_THUNK_DATA, pDosHeader, pImportDesc->OriginalFirstThunk);
+        // Iterate through the list of function names imported by msvr*.dll
+		    while (pThunk->u1.AddressOfData) {
+		      pImportByName = MakePtr(PIMAGE_IMPORT_BY_NAME, pDosHeader, pThunk->u1.AddressOfData);
+		      // Function name found in the list...
+		      if ( strcmp(pImportByName->Name, pszOldFunctionName) == 0 ) {
+			      CloseHandle (hModuleSnap);
+			      DEBUGSTR("Module found : %s", pszModName);
+			      return pszModName;  // return the current module name
+		      }
+		      pThunk++;
+		    }
+        pImportDesc++;  // Advance to next imported module descriptor
+	    }
+	  }
+  }
+  CloseHandle (hModuleSnap);
+  return NULL;  // OldFunctionName not found 
+}
+
+//-----------------------------------------------------------------------------
 //   HookAPIAllMod
 // Substitute a new function in the Import Address Table (IAT) of all
 // the modules in the current process.
@@ -234,7 +328,6 @@ BOOL HookAPIOneMod(
 //-----------------------------------------------------------------------------
 
 BOOL HookAPIAllMod(
-    PSTR    pszFunctionModule,      // Module to intercept calls to
     PSTR    pszOldFunctionName,     // Function to intercept calls to
     PROC    pfnNewFunction          // New function (replaces old function)
     )
@@ -242,6 +335,13 @@ BOOL HookAPIAllMod(
   HANDLE          hModuleSnap = NULL;
   MODULEENTRY32   me        = {0};
   BOOL fOk;
+  PSTR pszModName;
+
+  pszModName = SearchModFunc(pszOldFunctionName);
+  if ( pszModName == NULL ) {
+    DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
+    return FALSE;
+  }
 
   // Take a snapshot of all modules in the current process.
   hModuleSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
@@ -258,9 +358,10 @@ BOOL HookAPIAllMod(
   for (fOk = Module32First(hModuleSnap, &me); fOk; fOk = Module32Next(hModuleSnap, &me) ) {
     // Hooking into the C runtime library
     if ( strstr(me.szModule, "MSVC") != NULL || strstr(me.szModule, "msvc") != NULL ) {
+	// if ( me.hModule != hDllInstance ) {
       DEBUGSTR("Hooking in %s", me.szModule);
       // Hook this function in this module
-      if (!HookAPIOneMod(me.hModule, pszFunctionModule, pszOldFunctionName, pfnNewFunction) ) {
+      if (!HookAPIOneMod(me.hModule, pszModName, pszOldFunctionName, pfnNewFunction) ) {
         CloseHandle (hModuleSnap);
         DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
         return FALSE;
@@ -270,6 +371,8 @@ BOOL HookAPIAllMod(
   CloseHandle (hModuleSnap);
   return TRUE;
 }
+
+
 
 // ========== Print Buffer functions
 
@@ -983,7 +1086,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 		  SaveCP = GetConsoleOutputCP();
 		  Cp_Out = SaveCP;
 		  Cp_In  = GetACP();
-		  bResult = HookAPIAllMod("KERNEL32.dll", "WriteFile", (PROC)MyWriteFile);
+		  bResult = HookAPIAllMod("WriteFile", (PROC)MyWriteFile);
 			break;
 
 		case DLL_PROCESS_DETACH:

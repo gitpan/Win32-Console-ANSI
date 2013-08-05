@@ -1,7 +1,7 @@
-Win32::Console::ANSI version 1.04
+Win32::Console::ANSI version 1.05
 =================================
 
-Windows NT/2000/XP/2003/Vista does not support ANSI escape sequences in 
+Windows NT/2000/XP/2003/Vista does not support ANSI escape sequences in
 Win32 Console applications.
 This module emulate an ANSI console for the script which uses it.
 
@@ -24,13 +24,11 @@ INSTALLATION
 
 A recent SDK is necessary to compile this module.
 
-If your SDK is too old the compiler emit the fatal error C1189 with the 
+If your SDK is too old the compiler emit the fatal error C1189 with the
 message: "your SDK is too old... (see the README file in the distro)"
 Download and install the last SDK for your platform from Microsoft:
 
-http://www.microsoft.com/msdownload/platformsdk/sdkupdate/
-  or
-http://www.microsoft.com/downloads/browse.aspx?displaylang=en&productID=6F6B7367-A11C-49C3-8CC6-92E74D092146
+http://windows.microsoft.com/en-us/windows/service-packs-download
 
 To install this module, just follow the usual procedure:
 
@@ -41,7 +39,7 @@ To install this module, just follow the usual procedure:
 
 COPYRIGHT AND LICENCE
 
-Copyright (c) 2009 J-L Morel. All rights reserved.
+Copyright (c) 2013 J-L Morel. All rights reserved.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

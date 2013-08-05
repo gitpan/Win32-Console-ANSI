@@ -32,3 +32,4 @@ t/09_Compatibility2.pl
 t/09_Compatibility2.t
 t/99_Kwalitee.t
 META.yml                                 Module meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

@@ -71,10 +71,17 @@ Revision history for Perl extension Win32::Console::ANSI
   - bug with Windows Vista64 + SP1 (RT#43592 and RT#43639) -fixed
     (thanks to Sisyphus)
 
-1.03  2009/03/07 
-  - Modifications of the xs so that the module can be compiled under 
+1.03  2009/03/07
+  - Modifications of the xs so that the module can be compiled under
     Windows x64 (with Perl 64bits). (thanks to Sisyphus)
-    
+
 1.04 2009/03/22
   - New modification of the xs: the module can now be compiled under Windows 7
     (32 and 64 bits, with Perl 32 and 64).
+
+1.05 2013/08/05
+  - Use DWORD_PTR for pointer arithmetics RT#46139 -fixed
+  - typo fix RT#86748 -fixed
+  - Default Initialisation of background/foreground color RT#86089
+    (thanks to Jörg Kreuzberger for the patch)
+

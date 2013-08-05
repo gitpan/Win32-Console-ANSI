@@ -34,7 +34,7 @@ void DEBUGSTR( char * szFormat, ...) {  // sort of OutputDebugStringf
 // ========== Global variables and constants
 
 // Macro for adding pointers/DWORDs together without C arithmetic interfering
-#define MakePtr( cast, ptr, addValue ) (cast)( (unsigned __int64)(ptr)+(DWORD)(addValue))
+#define MakePtr( cast, ptr, addValue ) (cast)( (DWORD_PTR)(ptr)+(DWORD)(addValue))
 
 HINSTANCE hDllInstance;         // Dll instance handle
 HWND hConWnd;                   // Console window handle
@@ -67,31 +67,49 @@ int es_argv[MAX_ARG];           // escape sequence args
 #define BACKGROUND_BLACK 0
 #define BACKGROUND_WHITE BACKGROUND_RED|BACKGROUND_GREEN|BACKGROUND_BLUE
 
-WORD foregroundcolor[8] = {
-  FOREGROUND_BLACK,                                 // black foreground
-  FOREGROUND_RED,                                   // red foreground
-  FOREGROUND_GREEN,                                 // green foreground
-  FOREGROUND_RED|FOREGROUND_GREEN,                  // yellow foreground
-  FOREGROUND_BLUE,                                  // blue foreground
-  FOREGROUND_BLUE|FOREGROUND_RED,                   // magenta foreground
-  FOREGROUND_BLUE|FOREGROUND_GREEN,                 // cyan foreground
-  FOREGROUND_WHITE                                  // white foreground
-};
+WORD foregroundcolor[16] = {
+  FOREGROUND_BLACK,                                       // black foreground
+  FOREGROUND_RED,                                         // red foreground
+  FOREGROUND_GREEN,                                       // green foreground
+  FOREGROUND_RED|FOREGROUND_GREEN,                        // yellow foreground
+  FOREGROUND_BLUE,                                        // blue foreground
+  FOREGROUND_BLUE|FOREGROUND_RED,                         // magenta foreground
+  FOREGROUND_BLUE|FOREGROUND_GREEN,                       // cyan foreground
+  FOREGROUND_WHITE,                                       // white foreground
+  FOREGROUND_BLACK|FOREGROUND_INTENSITY,                  // black foreground bright
+  FOREGROUND_RED|FOREGROUND_INTENSITY,                    // red foreground bright
+  FOREGROUND_GREEN|FOREGROUND_INTENSITY,                  // green foreground bright
+  FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY,   // yellow foreground bright
+  FOREGROUND_BLUE|FOREGROUND_INTENSITY ,                  // blue foreground bright
+  FOREGROUND_BLUE|FOREGROUND_RED|FOREGROUND_INTENSITY,    // magenta foreground bright
+  FOREGROUND_BLUE|FOREGROUND_GREEN|FOREGROUND_INTENSITY,  // cyan foreground bright
+  FOREGROUND_WHITE|FOREGROUND_INTENSITY                   // gray foreground bright
+  };
 
-WORD backgroundcolor[8] = {
-  BACKGROUND_BLACK,                                 // black background
-  BACKGROUND_RED,                                   // red background
-  BACKGROUND_GREEN,                                 // green background
-  BACKGROUND_RED|BACKGROUND_GREEN,                  // yellow background
-  BACKGROUND_BLUE,                                  // blue background
-  BACKGROUND_BLUE|BACKGROUND_RED,                   // magenta background
-  BACKGROUND_BLUE|BACKGROUND_GREEN,                 // cyan background
-  BACKGROUND_WHITE,                                 // white background
+WORD backgroundcolor[16] = {
+  BACKGROUND_BLACK,                                       // black background
+  BACKGROUND_RED,                                         // red background
+  BACKGROUND_GREEN,                                       // green background
+  BACKGROUND_RED|BACKGROUND_GREEN,                        // yellow background
+  BACKGROUND_BLUE,                                        // blue background
+  BACKGROUND_BLUE|BACKGROUND_RED,                         // magenta background
+  BACKGROUND_BLUE|BACKGROUND_GREEN,                       // cyan background
+  BACKGROUND_WHITE,                                       // white background
+  BACKGROUND_BLACK|BACKGROUND_INTENSITY,                  // black background bright
+  BACKGROUND_RED|BACKGROUND_INTENSITY,                    // red background bright
+  BACKGROUND_GREEN|BACKGROUND_INTENSITY,                  // green background bright
+  BACKGROUND_RED|BACKGROUND_GREEN|BACKGROUND_INTENSITY,   // yellow background bright
+  BACKGROUND_BLUE|BACKGROUND_INTENSITY,                   // blue background bright
+  BACKGROUND_BLUE|BACKGROUND_RED|BACKGROUND_INTENSITY,    // magenta background bright
+  BACKGROUND_BLUE|BACKGROUND_GREEN|BACKGROUND_INTENSITY,  // cyan background bright
+  BACKGROUND_WHITE|BACKGROUND_INTENSITY                   // white background bright
 };
 
 // screen attributes
 WORD foreground = FOREGROUND_WHITE;
 WORD background = BACKGROUND_BLACK;
+WORD foreground_default = FOREGROUND_WHITE;
+WORD background_default = BACKGROUND_BLACK;
 WORD bold       = 0;
 WORD underline  = 0;
 WORD rvideo     = 0;
@@ -317,7 +335,7 @@ PSTR SearchModFunc(
 	  }
   }
   CloseHandle (hModuleSnap);
-  return NULL;  // OldFunctionName not found 
+  return NULL;  // OldFunctionName not found
 }
 
 //-----------------------------------------------------------------------------
@@ -371,8 +389,6 @@ BOOL HookAPIAllMod(
   CloseHandle (hModuleSnap);
   return TRUE;
 }
-
-
 
 // ========== Print Buffer functions
 
@@ -447,8 +463,10 @@ void InterpretEscSeq( )
         for(i=0; i<es_argc; i++) {
           switch (es_argv[i]) {
             case 0 :
-              foreground = FOREGROUND_WHITE;
-              background = BACKGROUND_BLACK;
+              foreground = foreground_default;
+              background = background_default;
+              DEBUGSTR("resetting foreground to  = 0x%.8x", foreground);
+              DEBUGSTR("resetting background to  = 0x%.8x", background);
               bold = 0;
               underline = 0;
               rvideo = 0;
@@ -479,13 +497,22 @@ void InterpretEscSeq( )
               concealed = 0;
               break;
           }
-          if ( (30 <= es_argv[i]) && (es_argv[i] <= 37) ) foreground = es_argv[i]-30;
-          if ( (40 <= es_argv[i]) && (es_argv[i] <= 47) ) background = es_argv[i]-40;
+          if ( (30 <= es_argv[i]) && (es_argv[i] <= 37) )
+          {
+            foreground = es_argv[i]-30;
+            DEBUGSTR("setting foreground to = 0x%.8x", foreground);
+          }
+          if ( (40 <= es_argv[i]) && (es_argv[i] <= 47) )
+          {
+            DEBUGSTR("setting background to = 0x%.8x", background);
+            background = es_argv[i]-40;
+          }
         }
         if (rvideo) attribut = foregroundcolor[background] | backgroundcolor[foreground];
         else attribut = foregroundcolor[foreground] | backgroundcolor[background];
         if (bold) attribut |= FOREGROUND_INTENSITY;
         if (underline) attribut |= BACKGROUND_INTENSITY;
+        DEBUGSTR("set console color to = 0x%.8x", attribut);
         SetConsoleTextAttribute(hConOut, attribut);
         return;
 
@@ -1054,6 +1081,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 	BOOL bResult = TRUE;
 	typedef HWND (WINAPI *GETCONWINH)(void);
   GETCONWINH pfnGetConWinH;
+  CONSOLE_SCREEN_BUFFER_INFO Info;
 	switch( dwReason )
 	{
 		case DLL_PROCESS_ATTACH:
@@ -1086,6 +1114,23 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 		  SaveCP = GetConsoleOutputCP();
 		  Cp_Out = SaveCP;
 		  Cp_In  = GetACP();
+                              // save foreground and background colors
+      GetConsoleScreenBufferInfo(hConOut, &Info);
+      Info.wAttributes &= ~(COMMON_LVB_LEADING_BYTE | COMMON_LVB_TRAILING_BYTE |
+                            COMMON_LVB_GRID_HORIZONTAL | COMMON_LVB_GRID_LVERTICAL |
+                            COMMON_LVB_GRID_RVERTICAL | COMMON_LVB_REVERSE_VIDEO | 
+                            COMMON_LVB_UNDERSCORE);
+      foreground_default = Info.wAttributes;
+      foreground_default &= ~(BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY);
+      background_default = Info.wAttributes;
+      background_default &= ~(FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
+      background_default = (background_default >>  4) & 0x0F;
+      DEBUGSTR("foreground_default = 0x%.8x", foreground_default);
+      DEBUGSTR("foreground = 0x%.8x", foreground);
+      DEBUGSTR("background_default = 0x%.8x", background_default);
+      DEBUGSTR("background = 0x%.8x", background);
+      foreground = foreground_default;
+      background = background_default;
 		  bResult = HookAPIAllMod("WriteFile", (PROC)MyWriteFile);
 			break;
 
@@ -1403,9 +1448,5 @@ _chcp( new_Cp_In, new_Cp_Out )
     EXTEND(SP, 2);
     PUSHs(sv_2mortal(newSViv(old_Cp_In)));
     PUSHs(sv_2mortal(newSViv(old_Cp_Out)));
-
-
-
-
 
 

@@ -1,8 +1,8 @@
 package Win32::Console::ANSI;
 #
-# Copyright (c) 2004-2009 Jean-Louis Morel <jl_morel@bribes.org>
+# Copyright (c) 2004-2013 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 1.04 (22/03/2009)
+# Version 1.05 (05/08/2013)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,7 +19,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '1.04';
+our $VERSION = '1.05';
 
 use constant  MS_ON      => -1;
 use constant  MS_STANDBY => 1;
@@ -475,7 +475,7 @@ similar to SW_SHOW, except the window is not activated.
 =item * SW_SHOWNOACTIVATE
 
 Displays the console window in its most recent size and position. This value is
-similar to SW_NORMAL, except the window is not actived.
+similar to SW_NORMAL, except the window is not activated.
 
 =item * SW_NORMAL
 
@@ -642,7 +642,7 @@ Report bug: http://rt.cpan.org/Public/Dist/Display.html?Name=Win32-Console-ANSI
 
 =head1 COPYRIGHT
 
-Copyright (c) 2003-2007 J-L Morel. All rights reserved.
+Copyright (c) 2003-2013 J-L Morel. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

@@ -19,7 +19,7 @@ sub ok {
 }
 
 $npipe->Read();
-$npipe->Write("1..92\n");        # <== test plan
+$npipe->Write("1..98\n");        # <== test plan
 
 # ****************************** BEGIN TESTS
 
@@ -576,13 +576,13 @@ ok( $x==$Xmax and $y==$Ymax );
 # test 89
 Cursor(12, 4);
 print "\e[u";
-($x, $y) = Cursor(); 
+($x, $y) = Cursor();
 ok( $x==1 and $y==1 );
 
 # test 90
 Cursor(12, 4);
 print "\e[s";
-($x, $y) = Cursor(); 
+($x, $y) = Cursor();
 ok( $x==12 and $y==4 );
 
 # test 91
@@ -594,6 +594,40 @@ ok( $x==27 and $y==9 );
 print "\e[u";
 ($x, $y) = Cursor();
 ok( $x==12 and $y==4 );
+
+# ======== tests for \e[?25h and \e[?25l
+
+# test 93
+print "blahblah\e[?25hblahblah";
+my $cursorstate = (Win32::Console::ANSI::_GetCursorInfo())[1];
+ok( $cursorstate );
+
+# test 94
+print "blahblah\e[?25lblahblah";
+my $cursorstate = (Win32::Console::ANSI::_GetCursorInfo())[1];
+ok( !$cursorstate );
+
+# test 95
+print "blahblah\e[?25hblahblah";
+$cursorstate = (Win32::Console::ANSI::_GetCursorInfo())[1];
+ok( $cursorstate );
+
+# test 96
+print "blahblah\e[?25kblahblah";
+$cursorstate = (Win32::Console::ANSI::_GetCursorInfo())[1];
+ok( $cursorstate );
+
+# test 97
+print "blahblah\e\e\e[?25lblahblah";
+$cursorstate = (Win32::Console::ANSI::_GetCursorInfo())[1];
+ok( !$cursorstate );
+
+# test 98
+print "blahblah\e\e\e[?26hblahblah";
+$cursorstate = (Win32::Console::ANSI::_GetCursorInfo())[1];
+ok( !$cursorstate );
+
+
 
 # ====== END TESTS
 

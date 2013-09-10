@@ -37,7 +37,7 @@ sub comp {            # compare screendump MD5 digests
     if ( $skip) {
       push @dig, $digest;
       return;
-    }    
+    }
     if ( <STDIN> eq "\n" ) {
       push @dig, $digest;
     }
@@ -47,7 +47,7 @@ sub comp {            # compare screendump MD5 digests
   }
   else {
     $npipe->Read();
-    $npipe->Write($digest eq $dig[$n-1] ? "ok $n\n":"not ok $n\n"); 
+    $npipe->Write($digest eq $dig[$n-1] ? "ok $n\n":"not ok $n\n");
   }
 }
 
@@ -72,7 +72,7 @@ foreach my $fg (@colors) {
     print color $_;
     print " abcdef ";
   }
-print "\n", color 'reset'; 
+print "\n", color 'reset';
 }
 print "\n";
 foreach my $fg (@colors) {
@@ -81,7 +81,7 @@ foreach my $fg (@colors) {
     print color "bold $_";
     print " abcdef ";
   }
-print "\n", color 'reset'; 
+print "\n", color 'reset';
 }
 
 # sleep 5 if $save;
@@ -96,7 +96,7 @@ foreach my $fg (@colors) {
     print color $_;
     print " abcdef ";
   }
-print "\n", color 'reset'; 
+print "\n", color 'reset';
 }
 print "\n";
 foreach my $fg (@colors) {
@@ -105,7 +105,7 @@ foreach my $fg (@colors) {
     print color "bold $_";
     print " abcdef ";
   }
-print "\n", color 'reset'; 
+print "\n", color 'reset';
 }
 
 # sleep 5 if $save;
@@ -120,7 +120,7 @@ foreach my $fg (@colors) {
     print color $_;
     print " abcdef ";
   }
-print "\n", color 'reset'; 
+print "\n", color 'reset';
 }
 print "\n";
 foreach my $fg (@colors) {
@@ -129,7 +129,7 @@ foreach my $fg (@colors) {
     print color "bold $_";
     print " abcdef ";
   }
-print "\n", color 'reset'; 
+print "\n", color 'reset';
 }
 
 # sleep 5 if $save;

@@ -25,19 +25,19 @@ $npipe->Write("1..22\n");        # <== test plan
 
 # ======== tests ShowConsoleWindow function
 
-# test 01 
-ok( ShowConsoleWindow(SW_HIDE) ); 
+# test 01
+ok( ShowConsoleWindow(SW_HIDE) );
 
-# test 02 
+# test 02
 ok( 0 == ShowConsoleWindow(SW_MAXIMIZE) );
 
-# test 03 
+# test 03
 ok( ShowConsoleWindow(SW_MAXIMIZE) );
 
-# test 04 
+# test 04
 ok( ShowConsoleWindow(SW_MINIMIZE) );
 
-# test 05 
+# test 05
 ok( ShowConsoleWindow(SW_RESTORE) );
 
 # test 06
@@ -99,17 +99,17 @@ ok( MS_OFF );     # existence only
 if ( SetConsoleFullScreen(1) ) {
   Cls;
   my ($Xmax, $Ymax) = XYMax();
-  
+
   my $msg = "FULL-SCREEN MODE TEST";
   my $x = int(($Xmax - length $msg)/2);
   print "\e[33;1m\e[5;${x}H$msg\e[m";
-  
+
   $msg = "Don't panic.";
   $x = int (($Xmax - length $msg)/2);
   print "\e[32;1m\e[7;${x}H$msg\e[m\n\n";
-  
+
   sleep 5;
-  
+
   SetConsoleFullScreen(0)
 }
 

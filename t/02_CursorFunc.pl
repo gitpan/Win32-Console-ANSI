@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 use Win32::Pipe;
-use Win32::Console::ANSI qw( Cursor Title XYMax Cls ScriptCP );
+use Win32::Console::ANSI qw( Cursor Title XYMax Cls ScriptCP CursorSize );
 
 close STDOUT;                 # needed for Win9x
 open STDOUT, '+> CONOUT$';
@@ -19,7 +19,7 @@ sub ok {
 }
 
 $npipe->Read();
-$npipe->Write("1..29\n");        # <== test plan
+$npipe->Write("1..39\n");        # <== test plan
 
 # ====== BEGIN TESTS
 
@@ -163,11 +163,11 @@ ok( $title eq $new_title1 );
 $title = Title();
 ok( $title eq $new_title1 );
 
-# test 26   
+# test 26
 $title = Title($new_title2);
 ok( $title eq $new_title1 );
 
-# test 27   
+# test 27
 $title = Title();
 ok( $title eq $new_title2 );
 
@@ -184,6 +184,58 @@ $cp = ScriptCP();
 ok( $cp == 1250 );
 
 ScriptCP($old_cp);
+
+# ======== tests CursorSize function
+
+# test 30
+my $size1 = CursorSize();
+my $size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+ok( $size1 == $size2 );
+
+# test 31
+CursorSize(77);
+$size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+ok( $size2 == 77 );
+
+# test 32
+CursorSize(0);
+$size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+ok( $size2 == 1 );
+
+# test 33
+CursorSize(-5);
+$size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+print STDERR "\n$size2\n";
+ok( $size2 == 1 );
+
+# test 34
+CursorSize(100);
+$size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+ok( $size2 == 100 );
+
+# test 35
+CursorSize(101);
+$size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+ok( $size2 == 100 );
+
+# test 36
+CursorSize(777);
+$size2 = (Win32::Console::ANSI::_GetCursorInfo())[0];
+ok( $size2 == 100 );
+
+# test 37
+CursorSize(82);
+$size1 = CursorSize();
+ok( $size1 == 82 );
+
+# test 38
+$size1 = CursorSize(56);
+ok( $size1 == 82 );
+
+# test 39
+$size1 = CursorSize();
+ok( $size1 == 56 );
+
 
 # ====== END TESTS
 

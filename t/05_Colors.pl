@@ -37,7 +37,7 @@ sub comp {            # compare screendump MD5 digests
     if ( $skip) {
       push @dig, $digest;
       return;
-    }    
+    }
     if ( <STDIN> eq "\n" ) {
       push @dig, $digest;
     }
@@ -62,7 +62,7 @@ my ($Xmax, $Ymax) = XYMax();
 
 # ======== tests for \e[#J ED: Erase Display:
 
-# test 01                            
+# test 01
 print("\n\e[2J\n   Normal:\n\n");
 print(" BLACK   \e[40;30m black \e[31mred \e[32mgreen \e[33myellow \e[34mblue \e[35mmagenta \e[36mcyan \e[37mwhite \e[0m\n");
 print(" RED     \e[41;30m black \e[31mred \e[32mgreen \e[33myellow \e[34mblue \e[35mmagenta \e[36mcyan \e[37mwhite \e[0m\n");
@@ -141,7 +141,7 @@ foreach my $bg (40..47) {
 }
 
 # test 35
-  
+
 Cls;
 print "\e[32;1mWriting in STDOUT\e[m\n";
 open OUTCOPY, ">&STDOUT";

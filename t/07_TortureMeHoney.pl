@@ -36,7 +36,7 @@ sub comp {            # compare screendump MD5 digests
     if ( $skip) {
       push @dig, $digest;
       return;
-    }    
+    }
     if ( <STDIN> eq "\n" ) {
       push @dig, $digest;
     }
@@ -62,7 +62,7 @@ my ($Xmax, $Ymax) = XYMax();
 # ======== tests for \e[#J ED: Erase Display:
 
 # test 01
-Cls();                            
+Cls();
 print "(01)-1234567890\e1234567890\n";
 print "(02)-1234567890\e\e1234567890\n";
 print "(03)-1234567890\e\e\e1234567890\n";
@@ -83,7 +83,7 @@ print "\e[1;".('32;'x10000).'34m'."abcdefghijklm\e[m\n";
 
 comp(1);
 
-# test 02   
+# test 02
 Cls;
 
 print '1234567890';
@@ -113,7 +113,7 @@ print "abcdefghij\n";
 comp(1);
 
 # test 03
-  
+
 Cls;
 
 $s = "1234567890\x0D\x0Aabcdefghij";  # \r\n

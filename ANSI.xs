@@ -55,6 +55,7 @@ SETCONDISPMODE pfnSetConDispMode;
 #define MAX_ARG 16              // max number of args in an escape sequence
 int state;                      // automata state
 char prefix;                    // escape sequence prefix ( '[' or '(' );
+char prefix2;			              // secondary prefix ( '?' );
 char suffix;                    // escape sequence suffix
 int es_argc;                    // escape sequence args count
 int es_argv[MAX_ARG];           // escape sequence args
@@ -152,8 +153,7 @@ BOOL HookAPIOneMod(
   // Verify that the module and function names passed are valid
   pfnOldFunction = GetProcAddress( GetModuleHandle(pszFunctionModule),
                                    pszOldFunctionName );
-  if ( !pfnOldFunction )
-  {
+  if ( !pfnOldFunction ) {
     DEBUGSTR("error: %s(%d)", __FILE__, __LINE__);
     return FALSE;
   }
@@ -450,12 +450,24 @@ void InterpretEscSeq( )
   int i;
   WORD attribut;
   CONSOLE_SCREEN_BUFFER_INFO Info;
-  DWORD NumberOfCharsWritten;
+  CONSOLE_CURSOR_INFO CursInfo;
+  DWORD len, NumberOfCharsWritten;
   COORD Pos;
   SMALL_RECT Rect;
   CHAR_INFO CharInfo;
 
   if (prefix == '[') {
+    if (prefix2 == '?' && (suffix == 'h' || suffix == 'l')) {
+      if (es_argc == 1 && es_argv[0] == 25) {
+        GetConsoleCursorInfo( hConOut, &CursInfo );
+        CursInfo.bVisible = (suffix == 'h');
+        SetConsoleCursorInfo( hConOut, &CursInfo );
+        return;
+      }
+    }
+    // Ignore any other \e[? sequences.
+    if (prefix2 != 0) return;
+
     GetConsoleScreenBufferInfo(hConOut, &Info);
     switch (suffix) {
       case 'm':
@@ -497,13 +509,11 @@ void InterpretEscSeq( )
               concealed = 0;
               break;
           }
-          if ( (30 <= es_argv[i]) && (es_argv[i] <= 37) )
-          {
+          if ( (30 <= es_argv[i]) && (es_argv[i] <= 37) ) {
             foreground = es_argv[i]-30;
             DEBUGSTR("setting foreground to = 0x%.8x", foreground);
           }
-          if ( (40 <= es_argv[i]) && (es_argv[i] <= 47) )
-          {
+          if ( (40 <= es_argv[i]) && (es_argv[i] <= 47) ) {
             DEBUGSTR("setting background to = 0x%.8x", background);
             background = es_argv[i]-40;
           }
@@ -521,19 +531,19 @@ void InterpretEscSeq( )
         if ( es_argc != 1 ) return;
         switch (es_argv[0]) {
           case 0 :              // ESC[0J erase from cursor to end of display
+            len = (Info.dwSize.Y-Info.dwCursorPosition.Y-1)
+                  *Info.dwSize.X+Info.dwSize.X-Info.dwCursorPosition.X-1;
             FillConsoleOutputCharacter(
               hConOut,
               ' ',
-              (Info.dwSize.Y-Info.dwCursorPosition.Y-1)
-                  *Info.dwSize.X+Info.dwSize.X-Info.dwCursorPosition.X-1,
+              len,
               Info.dwCursorPosition,
               &NumberOfCharsWritten);
 
             FillConsoleOutputAttribute(
               hConOut,
               Info.wAttributes,
-              (Info.dwSize.Y-Info.dwCursorPosition.Y-1)
-                  *Info.dwSize.X+Info.dwSize.X-Info.dwCursorPosition.X-1,
+              len,
               Info.dwCursorPosition,
               &NumberOfCharsWritten);
             return;
@@ -541,17 +551,18 @@ void InterpretEscSeq( )
           case 1 :              // ESC[1J erase from start to cursor.
             Pos.X = 0;
             Pos.Y = 0;
+            len = Info.dwCursorPosition.Y*Info.dwSize.X+Info.dwCursorPosition.X+1;
             FillConsoleOutputCharacter(
               hConOut,
               ' ',
-              Info.dwCursorPosition.Y*Info.dwSize.X+Info.dwCursorPosition.X+1,
+              len,
               Pos,
               &NumberOfCharsWritten);
 
             FillConsoleOutputAttribute(
               hConOut,
               Info.wAttributes,
-              Info.dwCursorPosition.Y*Info.dwSize.X+Info.dwCursorPosition.X+1,
+              len,
               Pos,
               &NumberOfCharsWritten);
             return;
@@ -559,16 +570,17 @@ void InterpretEscSeq( )
           case 2 :              // ESC[2J Clear screen and home cursor
             Pos.X = 0;
             Pos.Y = 0;
+            len = Info.dwSize.X*Info.dwSize.Y;
             FillConsoleOutputCharacter(
               hConOut,
               ' ',
-              Info.dwSize.X*Info.dwSize.Y,
+              len,
               Pos,
               &NumberOfCharsWritten);
             FillConsoleOutputAttribute(
               hConOut,
               Info.wAttributes,
-              Info.dwSize.X*Info.dwSize.Y,
+              len,
               Pos,
               &NumberOfCharsWritten);
             SetConsoleCursorPosition(hConOut, Pos);
@@ -583,17 +595,18 @@ void InterpretEscSeq( )
         if ( es_argc != 1 ) return;
         switch (es_argv[0]) {
           case 0 :              // ESC[0K Clear to end of line
+            len = Info.srWindow.Right-Info.dwCursorPosition.X+1;
             FillConsoleOutputCharacter(
               hConOut,
               ' ',
-              Info.srWindow.Right-Info.dwCursorPosition.X+1,
+              len,
               Info.dwCursorPosition,
               &NumberOfCharsWritten);
 
             FillConsoleOutputAttribute(
               hConOut,
               Info.wAttributes,
-              Info.srWindow.Right-Info.dwCursorPosition.X+1,
+              len,
               Info.dwCursorPosition,
               &NumberOfCharsWritten);
             return;
@@ -960,6 +973,7 @@ ParseAndPrintString(HANDLE hDev,
       else if ( (*s == '[') || (*s == '(') ) {
         FlushBuffer();
         prefix = *s;
+        prefix2 = 0;
         state = 3;
       }
       else state = 1;
@@ -975,6 +989,9 @@ ParseAndPrintString(HANDLE hDev,
         es_argv[0] = 0;
         es_argv[es_argc] = 0;
         state = 4;
+      }
+      else if (*s == '?') {
+        prefix2 = *s;
       }
       else {
         es_argc = 0;
@@ -1118,7 +1135,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
       GetConsoleScreenBufferInfo(hConOut, &Info);
       Info.wAttributes &= ~(COMMON_LVB_LEADING_BYTE | COMMON_LVB_TRAILING_BYTE |
                             COMMON_LVB_GRID_HORIZONTAL | COMMON_LVB_GRID_LVERTICAL |
-                            COMMON_LVB_GRID_RVERTICAL | COMMON_LVB_REVERSE_VIDEO | 
+                            COMMON_LVB_GRID_RVERTICAL | COMMON_LVB_REVERSE_VIDEO |
                             COMMON_LVB_UNDERSCORE);
       foreground_default = Info.wAttributes;
       foreground_default &= ~(BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY);
@@ -1216,6 +1233,30 @@ Cursor( ... )
     PUSHs(sv_2mortal(newSViv(Info.dwCursorPosition.Y + 1)));
 
 # ---------------------------------------------------------
+# $old_size = CursorSize( [$new_size] );
+#   Gets and sets the cursor size.
+# ---------------------------------------------------------
+
+int
+CursorSize( ... )
+  CODE:
+    CONSOLE_CURSOR_INFO cursor_info;
+    int iNewSize;
+    GetConsoleCursorInfo(hConOut, &cursor_info);
+    RETVAL = cursor_info.dwSize;
+    if (items > 1)
+      croak("Usage: CursorSize( [new_size] )");
+    else if (items == 1 ) {
+      iNewSize = (int) SvIV(ST(0));
+      if ( iNewSize < 1 ) iNewSize = 1;
+      if ( iNewSize > 100 ) iNewSize = 100;
+      cursor_info.dwSize = (DWORD) iNewSize;
+      SetConsoleCursorInfo(hConOut, &cursor_info);
+    }
+  OUTPUT:
+    RETVAL
+
+# ---------------------------------------------------------
 # $old_title = Title( [$new_title] );
 #   Gets and sets the title bar of the current console window.
 # ---------------------------------------------------------
@@ -1223,19 +1264,17 @@ Cursor( ... )
 char *
 Title( ... )
   CODE:
-    char * old_title;
     size_t len;
-    New(0, old_title, MAX_TITLE_SIZE, char);
-    GetConsoleTitle(old_title, MAX_TITLE_SIZE);
+    New(0, RETVAL, MAX_TITLE_SIZE, char);
+    GetConsoleTitle(RETVAL, MAX_TITLE_SIZE);
     if (items > 1)
       croak("Usage: Title( [new_title] )");
     else if (items == 1 )
       SetConsoleTitle( SvPV(ST(0), len) );
-  RETVAL = old_title;
   OUTPUT:
     RETVAL
   CLEANUP:
-    Safefree(old_title);
+    Safefree(RETVAL);
 
 # ---------------------------------------------------------
 # ($Xmax, $Ymax) = XYMax();
@@ -1448,5 +1487,32 @@ _chcp( new_Cp_In, new_Cp_Out )
     EXTEND(SP, 2);
     PUSHs(sv_2mortal(newSViv(old_Cp_In)));
     PUSHs(sv_2mortal(newSViv(old_Cp_Out)));
+
+
+# ---------------------------------------------------------
+#    _GetCursorInfo()
+#  Get the size and the visibility indicator of the cursor
+#  This function is for tests only.
+# ---------------------------------------------------------
+
+void
+_GetCursorInfo()
+  PPCODE:
+    CONSOLE_CURSOR_INFO cursor_info;
+    GetConsoleCursorInfo(hConOut, &cursor_info);
+    EXTEND(SP, 2);
+    PUSHs(sv_2mortal(newSViv(cursor_info.dwSize)));
+    PUSHs(sv_2mortal(newSViv(cursor_info.bVisible)));
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -2,7 +2,7 @@ package Win32::Console::ANSI;
 #
 # Copyright (c) 2004-2013 Jean-Louis Morel <jl_morel@bribes.org>
 #
-# Version 1.05 (05/08/2013)
+# Version 1.06 (09/09/2013)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -19,7 +19,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 use constant  MS_ON      => -1;
 use constant  MS_STANDBY => 1;
@@ -39,13 +39,13 @@ use constant  SW_RESTORE         => 9;
 use constant  SW_SHOWDEFAULT     => 10;
 
 our %EXPORT_TAGS = (
-'func' => [ qw( Title Cursor XYMax SetConsoleSize Cls ScriptCP MinimizeAll SetMonitorState
+'func' => [ qw( Title Cursor CursorSize XYMax SetConsoleSize Cls ScriptCP MinimizeAll SetMonitorState
                ShowConsoleWindow SetCloseButton SetConsoleFullScreen )],
 'MS_' => [ qw( SetMonitorState MS_ON MS_OFF MS_STANDBY ) ],
 'SW_' => [ qw( MinimizeAll ShowConsoleWindow SW_HIDE SW_NORMAL SW_SHOWMINIMIZED
                SW_SHOWMAXIMIZED SW_MAXIMIZE SW_SHOWNOACTIVATE SW_SHOW SW_MINIMIZE
                SW_SHOWMINNOACTIVE SW_SHOWNA SW_RESTORE SW_SHOWDEFAULT ) ],
-'all' => [ qw( Title Cursor XYMax SetConsoleSize Cls ScriptCP MinimizeAll SetMonitorState
+'all' => [ qw( Title Cursor CursorSize XYMax SetConsoleSize Cls ScriptCP MinimizeAll SetMonitorState
                ShowConsoleWindow SetCloseButton SetConsoleFullScreen MS_ON MS_OFF MS_STANDBY
                SW_HIDE SW_NORMAL SW_SHOWMINIMIZED SW_SHOWMAXIMIZED
                SW_MAXIMIZE SW_SHOWNOACTIVATE SW_SHOW SW_MINIMIZE SW_SHOWMINNOACTIVE
@@ -360,6 +360,26 @@ console font is the Lucida Console TrueType font.)
 
 =back
 
+
+=head2 Extra escape sequences for Set Cursor Visibility
+
+The two following escape sequences are not in the ANSI standard.
+These are private escape sequences introduced by DEC for the VT-300
+series of video terminals.
+
+=over
+
+=item * \e[?25h
+
+DECTCEM: DEC Text Cursor Enable Mode: Shows the cursor.
+
+=item * \e[?25l
+
+DECTCEM: DEC Text Cursor Enable Mode: Hides the cursor. (Note: the trailing character is lowercase L.)
+
+=back
+
+
 =head1 AUXILIARY FUNCTIONS
 
 Because the module exports no symbols into the callers namespace, it is
@@ -369,12 +389,12 @@ necessary to import the names of the functions before using them.
 
 =item * Cls( );
 
-Clears the screen with the current background color, and set cursor to 
+Clears the screen with the current background color, and set cursor to
 (1,1).
 
 =item * $old_title = Title( [$new_title] );
 
-Gets and sets the title bar of the current console window. With no 
+Gets and sets the title bar of the current console window. With no
 argument, the title is not modified.
 
   use Win32::Console::ANSI qw/ Title /;
@@ -403,6 +423,13 @@ coordinate does not change.
 Gets the maximum cursor position.
 If C<($x, $y) = Cursor()> we have always C<1 E<lt>= $x E<lt>= $Xmax> and
 C<1 E<lt>= $y E<lt>= $Ymax>.
+
+=item * $old_size = CursorSize( [$new_size] );
+
+Gets and sets the cursor size i.e. the percentage of the character cell that
+is filled by the cursor. This value is between 1 and 100. The cursor appearance
+varies, ranging from completely filling the cell to showing up as a horizontal
+line at the bottom of the cell. With no argument, the cursor size is not modified.
 
 =item * $success = SetConsoleSize( $width, $height );
 
@@ -539,20 +566,20 @@ Example:
     do { $_ = <STDIN> } until defined;
 
     SetCloseButton(1);      # restore close button
-    print "Close button available\n  Press [Enter]...\n";                     
+    print "Close button available\n  Press [Enter]...\n";
     do { $_ = <STDIN> } until defined;
 
 =item * $success = SetConsoleFullScreen( $mode )
 
-Sets the console in full-screen or windowed mode. This function works only 
+Sets the console in full-screen or windowed mode. This function works only
 on WinXP/Vista...
 
 C<SetConsoleFullScreen( 1 )> sets the console in full-screen mode.
 
 C<SetConsoleFullScreen( 0 )> sets the console in windowed mode.
 
-If the function succeeds, the return value is nonzero. If the function 
-fails, the return value is zero and the extended error message is in 
+If the function succeeds, the return value is nonzero. If the function
+fails, the return value is zero and the extended error message is in
 C<$^E>).
 
 =item * SetMonitorState( $state )
@@ -621,12 +648,15 @@ exports all.
 
 =back
 
-=head1 LIMITATIONS
+=head1 CAVEATS
 
 Due to DOS-console limitations, the blink mode (text attributes 5 and 25) is
 not implemented.
 
-
+If you use an integrated environment for developing your program you can see
+strange results on the console controlled by your IDE. The IDE catches and
+processes the output of your program so your program does not see a "real"
+console. In this case test your program in a separate console.
 
 =head1 SEE ALSO
 

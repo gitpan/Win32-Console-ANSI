@@ -41,7 +41,7 @@ sub comp {
     if ( $skip) {
       push @dig, $digest;
       return;
-    }    
+    }
     if ( <STDIN> eq "\n" ) {
       push @dig, $digest;
     }
@@ -334,7 +334,7 @@ Cursor(25, 12);
 print "\e[1L";
 comp(1);
 
-# test 34                        
+# test 34
 print "\e[2J";             # clear screen
 print chr(65+$_)x80 for (0..23);
 print 'Y'x79;
@@ -343,7 +343,7 @@ Cursor(25, 12);
 print "\e[L";
 comp(1);
 
-# test 35                        
+# test 35
 print "\e[2J";             # clear screen
 print chr(65+$_)x80 for (0..23);
 print 'Y'x79;
@@ -352,7 +352,7 @@ Cursor(25, 12);
 print "\e[0L";
 comp(1);
 
-# test 36                       
+# test 36
 print "\e[2J";             # clear screen
 print chr(65+$_)x80 for (0..23);
 print 'Y'x79;
@@ -361,7 +361,7 @@ Cursor(25, 12);
 print "\e[5L";
 comp(1);
 
-# test 37                              Cursor (25, 1) 
+# test 37                              Cursor (25, 1)
 print "\e[2J";             # clear screen
 print chr(65+$_)x80 for (0..23);
 print 'Y'x79;
@@ -370,7 +370,7 @@ Cursor(25, 1);
 print "\e[3L";
 comp(1);
 
-# test 38                              Cursor (13, 25) 
+# test 38                              Cursor (13, 25)
 print "\e[2J";             # clear screen
 print chr(65+$_)x80 for (0..23);
 print 'Y'x79;
@@ -388,7 +388,7 @@ Cursor(13, $Ymax);
 print "\e[3L";
 comp(1);
 
-# test 40                              Cursor (13, 25) 
+# test 40                              Cursor (13, 25)
 print "\e[2J";             # clear screen
 print chr(65+$_)x80 for (0..23);
 print 'Y'x79;
@@ -515,7 +515,7 @@ print '1234567890'x8 for (0..23);
 print '-'x79;
 Cursor(25, 12);
 sleep 5 if $save;
-print "\e[@";           
+print "\e[@";
 comp(1);
 
 # test 54                              Cursor (25, 12)

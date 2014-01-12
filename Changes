@@ -1,5 +1,9 @@
 Revision history for Perl extension Win32::Console::ANSI
 
+1.07 2014/01/11
+  - Fix a bug about background/foreground colors.
+    (thanks to Gilles Maisonneuve to report this bug).
+
 1.06 2013/09/10
   - Added two DEC private esc seq DECTCEM: hide/show cursor RT#87992
     (Code adapted from the ansicon program. Thanks to Jason Hood.)

@@ -106,6 +106,9 @@ WORD backgroundcolor[16] = {
   BACKGROUND_WHITE|BACKGROUND_INTENSITY                   // white background bright
 };
 
+// Table to convert the color order of the console in the ANSI order.
+WORD conversion[16] = {0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15};
+
 // screen attributes
 WORD foreground = FOREGROUND_WHITE;
 WORD background = BACKGROUND_BLACK;
@@ -1085,7 +1088,30 @@ HWND GetConsoleHwnd(void)
   return(hwndFound);
 }
 
-// ========== Initialisation
+//-----------------------------------------------------------------------------
+//    GetConsoleColors()
+//  Returns in foreground and background the default colors used by the console
+//  The colors are converted in the ANSI order.
+//-----------------------------------------------------------------------------
+
+void GetConsoleColors(WORD *foreground, WORD *background)
+{
+  CONSOLE_SCREEN_BUFFER_INFO Info;
+  GetConsoleScreenBufferInfo(hConOut, &Info);
+  Info.wAttributes &= ~(COMMON_LVB_LEADING_BYTE    | COMMON_LVB_TRAILING_BYTE  |
+                        COMMON_LVB_GRID_HORIZONTAL | COMMON_LVB_GRID_LVERTICAL |
+                        COMMON_LVB_GRID_RVERTICAL  | COMMON_LVB_REVERSE_VIDEO  |
+                        COMMON_LVB_UNDERSCORE);
+  *foreground = Info.wAttributes;
+  *foreground &= ~(BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY);
+  *foreground = conversion[*foreground];
+
+  *background = Info.wAttributes;
+  *background &= ~(FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
+  *background = conversion[ (*background >>  4) & 0x0F ];
+}
+
+// ========== Initialization
 
 //-----------------------------------------------------------------------------
 //   DllMain()
@@ -1132,20 +1158,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 		  Cp_Out = SaveCP;
 		  Cp_In  = GetACP();
                               // save foreground and background colors
-      GetConsoleScreenBufferInfo(hConOut, &Info);
-      Info.wAttributes &= ~(COMMON_LVB_LEADING_BYTE | COMMON_LVB_TRAILING_BYTE |
-                            COMMON_LVB_GRID_HORIZONTAL | COMMON_LVB_GRID_LVERTICAL |
-                            COMMON_LVB_GRID_RVERTICAL | COMMON_LVB_REVERSE_VIDEO |
-                            COMMON_LVB_UNDERSCORE);
-      foreground_default = Info.wAttributes;
-      foreground_default &= ~(BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED | BACKGROUND_INTENSITY);
-      background_default = Info.wAttributes;
-      background_default &= ~(FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
-      background_default = (background_default >>  4) & 0x0F;
-      DEBUGSTR("foreground_default = 0x%.8x", foreground_default);
-      DEBUGSTR("foreground = 0x%.8x", foreground);
-      DEBUGSTR("background_default = 0x%.8x", background_default);
-      DEBUGSTR("background = 0x%.8x", background);
+      GetConsoleColors(&foreground_default, &background_default);
       foreground = foreground_default;
       background = background_default;
 		  bResult = HookAPIAllMod("WriteFile", (PROC)MyWriteFile);
@@ -1505,6 +1518,21 @@ _GetCursorInfo()
     PUSHs(sv_2mortal(newSViv(cursor_info.bVisible)));
 
 
+# ---------------------------------------------------------
+#    _GetConsoleColors()
+#  Get the default foreground and background colors
+#  This function is for tests only.
+# ---------------------------------------------------------
+
+void
+_GetConsoleColors()
+  PPCODE:
+    WORD foreground;
+    WORD background;
+    GetConsoleColors(&foreground, &background);
+    EXTEND(SP, 2);
+    PUSHs(sv_2mortal(newSViv(foreground)));
+    PUSHs(sv_2mortal(newSViv(background)));
 
 
 

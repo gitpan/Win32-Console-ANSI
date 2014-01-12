@@ -52,7 +52,7 @@ sub comp {            # compare screendump MD5 digests
 }
 
 $npipe->Read();
-$npipe->Write("1..35\n");        # <== test plan
+$npipe->Write("1..36\n");        # <== test plan
 
 # ****************************** BEGIN TESTS
 
@@ -151,6 +151,41 @@ select OUTCOPY;
 $|=1;
 print "\e[33;1mWriting in OUTCOPY\e[m\n";
 comp(1);
+
+# test 36
+
+Cls;
+my $r = 1;
+foreach my $i (0..15) {
+  my $b = $i;
+  my $u = '';
+  if ( $b >= 8 ) {
+    $b -= 8;
+    $u = '4;';
+  }
+  print "\e[m\n";
+  $b += 40;
+  foreach my $j (0..15) {
+    my $f = $j;
+    my $g = '';
+    if ( $f >= 8 ) {
+      $f -= 8;
+      $g = '1;';
+    }
+    $f += 30;
+    my $s = "\e[$f;$g$b;$u";
+    chop $s;
+    $s .= "mGlop\n";
+    print "\e[m";
+    print $s;
+    my ($f2, $b2) = Win32::Console::ANSI::_GetConsoleColors();
+    $r =0 if ( $i != $b2 or $j != $f2 );
+  }
+}
+print "\e[m";
+$n++;
+$npipe->Read();
+$npipe->Write($r ? "ok $n\n":"not ok $n\n");
 
 # ****************************** END TESTS
 

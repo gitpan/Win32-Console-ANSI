@@ -1,5 +1,9 @@
 Revision history for Perl extension Win32::Console::ANSI
 
+1.08 2014/01/13
+  - added #define PERL_NO_GET_CONTEXT to XS code, for efficiency RT#92071
+    Thanks to Daniel Dragan.
+
 1.07 2014/01/11
   - Fix a bug about background/foreground colors.
     (thanks to Gilles Maisonneuve to report this bug).

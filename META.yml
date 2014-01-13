@@ -20,4 +20,4 @@ no_index:
 requires:
   Win32::Pipe: 0
   Win32::Process: 0
-version: 1.07
+version: 1.08

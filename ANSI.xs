@@ -1,3 +1,4 @@
+#define PERL_NO_GET_CONTEXT     /* we want efficiency */
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -929,7 +930,8 @@ ParseAndPrintString(HANDLE hDev,
 {
   DWORD i;
   char * s;
-
+  
+  dTHX;
   if (hDev != hCurrentDev) {
     hCurrentDev = hDev;
     state = 1;            // reinit if device have changed
@@ -1124,7 +1126,6 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 	BOOL bResult = TRUE;
 	typedef HWND (WINAPI *GETCONWINH)(void);
   GETCONWINH pfnGetConWinH;
-  CONSOLE_SCREEN_BUFFER_INFO Info;
 	switch( dwReason )
 	{
 		case DLL_PROCESS_ATTACH:
